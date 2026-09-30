@@ -60,7 +60,7 @@ def check_scopes(graph, report):
 def drop_empty_gateways(graph, report):
     for node in list(graph.nodes.values()):
         ins, outs = graph.incoming(node.id), graph.outgoing(node.id)
-        if node.type in GATEWAYS and len(ins) == 1 and len(outs) == 1:
+        if node.type in GATEWAYS and not node.name and len(ins) == 1 and len(outs) == 1:
             report.fixes.append(f"Убран лишний шлюз {label(graph, node.id)}")
             ins[0].target = outs[0].target
             ins[0].name = ins[0].name or outs[0].name
@@ -94,15 +94,17 @@ def put_into_lanes(graph, report):
     if not boxes:
         return
     for node in graph.nodes.values():
-        if node.parent != graph.root.id:
+        if scope(graph, node.id) != graph.root.id or lane_of(graph, node.id):
             continue
         neighbours = [f.target for f in graph.outgoing(node.id)] + [f.source for f in graph.incoming(node.id)]
         if node.type == "endEvent":
             neighbours.reverse()
         lanes = [lane_of(graph, n) for n in neighbours if lane_of(graph, n)]
-        node.parent = lanes[0] if lanes else boxes[0]
+        chain = graph.ancestors(node.parent)
+        holder = node if len(chain) == 1 else chain[-2]
+        holder.parent = lanes[0] if lanes else boxes[0]
         if node.type not in EVENTS:
-            report.fixes.append(f"{label(graph, node.id)} перенесён в дорожку '{graph.containers[node.parent].name}'")
+            report.fixes.append(f"{label(graph, node.id)} перенесён в дорожку '{graph.containers[holder.parent].name}'")
 
 
 def make_message_flows(graph, report):
@@ -130,7 +132,7 @@ def close_pools(graph):
 def pool_event(graph, node_id, type):
     pool = graph.find_up(node_id, "pool")
     for other in graph.nodes.values():
-        if other.type == type and graph.find_up(other.id, "pool") == pool:
+        if other.type == type and scope(graph, other.id) == graph.root.id and graph.find_up(other.id, "pool") == pool:
             return other.id
     return graph.add_node(type, "", lane_of(graph, node_id)).id
 

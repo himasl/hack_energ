@@ -88,7 +88,18 @@ DRAWN = {
     "parallelGateway", "inclusiveGateway", "sequenceFlow", "messageFlow", "lane", "participant", "group",
 }
 
-CASES = {"simple": SIMPLE, "same_lane": SAME_LANE, "loop": LOOP, "nested": NESTED, "two_pools": TWO_POOLS}
+LOOP_CODE = """
+pool, lanes = DIAGRAM.add_pool(ROOT_PROCESS_ID, ['Оператор', 'Система'])
+steps = ['Принять показания', 'Проверить показания', 'Сохранить показания']
+prev = ROOT_START_TASK_ID
+for i, name in enumerate(steps):
+    task = DIAGRAM.add_task(name, lanes[i % len(lanes)])
+    DIAGRAM.add_link(prev, task)
+    prev = task
+DIAGRAM.add_link(prev, ROOT_END_TASK_ID)
+"""
+
+CASES = {"simple": SIMPLE, "loop_code": LOOP_CODE, "same_lane": SAME_LANE, "loop": LOOP, "nested": NESTED, "two_pools": TWO_POOLS}
 CASES.update({p.parent.name: p.read_text(encoding="utf-8") for p in EXAMPLES})
 
 
@@ -166,5 +177,6 @@ def test_fixes():
 def test_code_errors_point_to_line():
     assert build_from_code("a = DIAGRAM.add_task('x', 'Lane_9')").errors[0].startswith("строка 1:")
     assert "синтаксическая" in build_from_code("a = (").errors[0]
+    assert build_from_code("import os").errors
     bad = SIMPLE + "sub = DIAGRAM.create_subprocess('П', ROOT_PROCESS_ID)\nt = DIAGRAM.add_task('В', sub)\nDIAGRAM.add_link(a, t)\n"
     assert "границу подпроцесса" in build_from_code(bad).errors[0]

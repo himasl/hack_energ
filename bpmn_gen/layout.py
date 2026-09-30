@@ -82,16 +82,18 @@ def place(graph, scope_id, out, x0, y0):
         band_y[b], y, last_pool = y, y + band_h[b], pool
     height = y - y0
 
-    boxes = {}
+    grid = Grid(ids, rank, col_x, col_w)
     for i in rank:
         w, h = sizes[i]
         r, s, b = rank[i], slot[i], band[i]
         rows = slot_h[b]
         center = band_y[b] + PAD + sum(rows[:s]) + ROW_GAP * s + rows[s] / 2
+        grid.rows[i] = (center - rows[s] / 2, center + rows[s] / 2)
         if i in ids:
-            boxes[i] = (col_x[r] + (col_w[r] - w) / 2, center - h / 2, w, h)
+            grid.boxes[i] = (col_x[r] + (col_w[r] - w) / 2, center - h / 2, w, h)
         else:
-            boxes[i] = (col_x[r], center, col_w[r], 0)
+            grid.boxes[i] = (col_x[r], center, col_w[r], 0)
+    boxes = grid.boxes
 
     for n in nodes:
         out.shapes[n.id] = boxes[n.id]
@@ -102,12 +104,11 @@ def place(graph, scope_id, out, x0, y0):
         add_pools(graph, bands, band_y, band_h, out, x0, width)
     for f in flows:
         if f.id in chains:
-            out.edges[f.id] = route(graph, f, boxes, chains[f.id][1:-1])
+            out.edges[f.id] = route(graph, f, grid, chains[f.id][1:-1])
         elif f.kind == "messageFlow":
-            out.edges[f.id] = message_route(boxes[f.source], boxes[f.target])
+            out.edges[f.id] = message_route(f, grid)
         else:
-            floor = lowest(boxes, ids, f, band_y[band[f.target]], band_h[band[f.target]])
-            out.edges[f.id] = back_route(boxes[f.source], boxes[f.target], floor)
+            out.edges[f.id] = back_route(f, grid, band_y[band[f.target]], band_h[band[f.target]])
     for n in nodes:
         if n.type in GATEWAYS and n.name:
             out.labels[n.id] = gateway_label(graph, n.id, boxes[n.id], out.edges)
@@ -237,54 +238,77 @@ def add_pools(graph, bands, band_y, band_h, out, x0, width):
                 out.shapes[b] = (x0 + HEADER, band_y[b], width - HEADER, band_h[b])
 
 
-def route(graph, flow, boxes, via):
-    sx, sy, sw, sh = boxes[flow.source]
-    tx, ty, tw, th = boxes[flow.target]
-    scy, tcy = sy + sh / 2, ty + th / 2
-    first = boxes[via[0]][1] if via else tcy
+class Grid:
+    def __init__(self, ids, rank, col_x, col_w):
+        self.ids, self.rank, self.col_x, self.col_w = ids, rank, col_x, col_w
+        self.boxes, self.rows = {}, {}
 
-    if graph.nodes[flow.source].type in GATEWAYS and abs(first - scy) >= 1:
+    def left_gap(self, i):
+        return self.col_x[self.rank[i]] - COL_GAP / 2
+
+    def right_gap(self, i):
+        return self.col_x[self.rank[i]] + self.col_w[self.rank[i]] + COL_GAP / 2
+
+    def clear(self, i, y1, y2):
+        low, high = min(y1, y2), max(y1, y2)
+        return not any(
+            j != i and self.rank[j] == self.rank[i] and self.boxes[j][1] < high and self.boxes[j][1] + self.boxes[j][3] > low
+            for j in self.ids
+        )
+
+
+def route(graph, flow, grid, via):
+    sx, sy, sw, sh = grid.boxes[flow.source]
+    tx, ty, tw, th = grid.boxes[flow.target]
+    scy, tcy = sy + sh / 2, ty + th / 2
+    first = grid.boxes[via[0]][1] if via else tcy
+
+    if graph.nodes[flow.source].type in GATEWAYS and abs(first - scy) >= 1 and grid.clear(flow.source, scy, first):
         points = [(sx + sw / 2, sy if first < scy else sy + sh), (sx + sw / 2, first)]
     else:
         points = [(sx + sw, scy)]
     level = points[-1][1]
 
     for dummy in via:
-        left, y = boxes[dummy][:2]
+        y = grid.boxes[dummy][1]
         if abs(y - level) >= 1:
-            points += [(left - COL_GAP / 2, level), (left - COL_GAP / 2, y)]
+            points += [(grid.left_gap(dummy), level), (grid.left_gap(dummy), y)]
             level = y
 
     if abs(level - tcy) >= 1:
-        if graph.nodes[flow.target].type in GATEWAYS:
+        if graph.nodes[flow.target].type in GATEWAYS and grid.clear(flow.target, level, tcy):
             return points + [(tx + tw / 2, level), (tx + tw / 2, ty if level < tcy else ty + th)]
-        points += [(tx - COL_GAP / 2, level), (tx - COL_GAP / 2, tcy)]
+        points += [(grid.left_gap(flow.target), level), (grid.left_gap(flow.target), tcy)]
     return points + [(tx, tcy)]
 
 
-def message_route(source, target):
-    sx, sy, sw, sh = source
-    tx, ty, tw, th = target
-    start, end = (sy + sh, ty) if ty > sy else (sy, ty + th)
-    mid = (start + end) / 2
-    return [(sx + sw / 2, start), (sx + sw / 2, mid), (tx + tw / 2, mid), (tx + tw / 2, end)]
-
-
-def lowest(boxes, ids, flow, band_top, band_height):
-    left = boxes[flow.target][0]
-    right = boxes[flow.source][0] + boxes[flow.source][2]
-    bottoms = [
-        y + h for x, y, w, h in (boxes[i] for i in ids)
-        if x < right and x + w > left and band_top <= y < band_top + band_height
+def message_route(flow, grid):
+    sx, sy, sw, sh = grid.boxes[flow.source]
+    tx, ty, tw, th = grid.boxes[flow.target]
+    down = ty > sy
+    start, end = (sy + sh, ty) if down else (sy, ty + th)
+    near = grid.rows[flow.source][1] + ROW_GAP / 2 if down else grid.rows[flow.source][0] - ROW_GAP / 2
+    far = grid.rows[flow.target][0] - ROW_GAP / 2 if down else grid.rows[flow.target][1] + ROW_GAP / 2
+    gap = grid.right_gap(flow.source) if tx + tw / 2 >= sx + sw / 2 else grid.left_gap(flow.source)
+    return [
+        (sx + sw / 2, start), (sx + sw / 2, near), (gap, near),
+        (gap, far), (tx + tw / 2, far), (tx + tw / 2, end),
     ]
-    return max(bottoms) + 20
 
 
-def back_route(source, target, floor):
-    sx, sy, sw, sh = source
-    tx, ty, tw, th = target
-    gap = sx + sw + COL_GAP / 2
-    return [(sx + sw, sy + sh / 2), (gap, sy + sh / 2), (gap, floor), (tx + tw / 2, floor), (tx + tw / 2, ty + th)]
+def back_route(flow, grid, band_top, band_height):
+    sx, sy, sw, sh = grid.boxes[flow.source]
+    tx, ty, tw, th = grid.boxes[flow.target]
+    exit_x, entry_x = grid.right_gap(flow.source), grid.left_gap(flow.target)
+    bottoms = [
+        y + h for x, y, w, h in (grid.boxes[i] for i in grid.ids)
+        if x < exit_x and x + w > entry_x and band_top <= y < band_top + band_height
+    ]
+    floor = max(bottoms, default=band_top + band_height - PAD) + ROW_GAP / 2
+    return [
+        (sx + sw, sy + sh / 2), (exit_x, sy + sh / 2), (exit_x, floor),
+        (entry_x, floor), (entry_x, ty + th / 2), (tx, ty + th / 2),
+    ]
 
 
 def add_groups(graph, out):

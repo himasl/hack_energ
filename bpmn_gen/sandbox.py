@@ -1,7 +1,11 @@
+import builtins
 import traceback
 from dataclasses import dataclass
 
 from .diagram import Diagram
+
+SAFE = ("range", "len", "enumerate", "zip", "list", "dict", "tuple", "str", "int", "min", "max")
+SAFE_BUILTINS = {name: getattr(builtins, name) for name in SAFE}
 
 
 @dataclass
@@ -13,7 +17,7 @@ class RunResult:
 def run_code(code, timeout=5):
     diagram = Diagram()
     scope = {
-        "__builtins__": {},
+        "__builtins__": SAFE_BUILTINS,
         "DIAGRAM": diagram,
         "ROOT_PROCESS_ID": diagram.root_process_id,
         "ROOT_START_TASK_ID": diagram.root_start_id,

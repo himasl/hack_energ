@@ -62,4 +62,7 @@ def generate(body: TextIn):
 
 @app.post("/api/build")
 def build(body: CodeIn):
-    return asdict(pipeline.build_from_code(body.code))
+    try:
+        return asdict(pipeline.build_from_code(body.code))
+    except Exception as e:
+        raise HTTPException(500, f"Внутренняя ошибка при сборке схемы: {e}")
