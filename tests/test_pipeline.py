@@ -56,12 +56,39 @@ DIAGRAM.add_link(call, take)
 DIAGRAM.add_link(take, ROOT_END_TASK_ID)
 """
 
+SAME_LANE = """
+check = DIAGRAM.add_task('Проверить показания счётчика', ROOT_PROCESS_ID)
+ok = DIAGRAM.add_exclusive_gateway('Показания в норме?', ROOT_PROCESS_ID)
+visit = DIAGRAM.add_task('Выехать на объект', ROOT_PROCESS_ID)
+act = DIAGRAM.add_task('Составить акт', ROOT_PROCESS_ID)
+merge = DIAGRAM.add_exclusive_gateway('', ROOT_PROCESS_ID)
+fork = DIAGRAM.add_parallel_gateway('', ROOT_PROCESS_ID)
+bill = DIAGRAM.add_task('Выставить счёт', ROOT_PROCESS_ID)
+notify = DIAGRAM.add_task('Уведомить абонента', ROOT_PROCESS_ID)
+archive = DIAGRAM.add_task('Архивировать данные', ROOT_PROCESS_ID)
+join = DIAGRAM.add_parallel_gateway('', ROOT_PROCESS_ID)
+DIAGRAM.add_link(ROOT_START_TASK_ID, check)
+DIAGRAM.add_link(check, ok)
+DIAGRAM.add_link(ok, visit, name='нет')
+DIAGRAM.add_link(visit, act)
+DIAGRAM.add_link(act, merge)
+DIAGRAM.add_link(ok, merge, name='да')
+DIAGRAM.add_link(merge, fork)
+DIAGRAM.add_link(fork, bill)
+DIAGRAM.add_link(fork, notify)
+DIAGRAM.add_link(fork, archive)
+DIAGRAM.add_link(bill, join)
+DIAGRAM.add_link(notify, join)
+DIAGRAM.add_link(archive, join)
+DIAGRAM.add_link(join, ROOT_END_TASK_ID)
+"""
+
 DRAWN = {
     "task", "userTask", "scriptTask", "subProcess", "startEvent", "endEvent", "exclusiveGateway",
     "parallelGateway", "inclusiveGateway", "sequenceFlow", "messageFlow", "lane", "participant", "group",
 }
 
-CASES = {"simple": SIMPLE, "loop": LOOP, "nested": NESTED, "two_pools": TWO_POOLS}
+CASES = {"simple": SIMPLE, "same_lane": SAME_LANE, "loop": LOOP, "nested": NESTED, "two_pools": TWO_POOLS}
 CASES.update({p.parent.name: p.read_text(encoding="utf-8") for p in EXAMPLES})
 
 
@@ -101,6 +128,33 @@ def test_shapes_do_not_overlap(name):
     for a, b in combinations(graph.nodes, 2):
         inside = graph.nodes[a].parent == b or graph.nodes[b].parent == a
         assert inside or not overlaps(shapes[a], shapes[b]), (a, b)
+
+
+def crosses(a, b, box):
+    x, y, w, h = box[0] + 2, box[1] + 2, box[2] - 4, box[3] - 4
+    if a[1] == b[1]:
+        return y < a[1] < y + h and max(a[0], b[0]) > x and min(a[0], b[0]) < x + w
+    if a[0] == b[0]:
+        return x < a[0] < x + w and max(a[1], b[1]) > y and min(a[1], b[1]) < y + h
+    return False
+
+
+@pytest.mark.parametrize("name", CASES)
+def test_edges_do_not_cross_shapes(name):
+    from bpmn_gen.layout import layout
+    from bpmn_gen.sandbox import run_code
+    from bpmn_gen.validate import validate
+
+    graph = run_code(CASES[name]).graph
+    validate(graph)
+    result = layout(graph)
+    for f in graph.flows:
+        around = {c.id for c in graph.ancestors(graph.nodes[f.source].parent)}
+        others = [n for n in graph.nodes if n not in (f.source, f.target) and n not in around]
+        points = result.edges[f.id]
+        for a, b in zip(points, points[1:]):
+            for n in others:
+                assert not crosses(a, b, result.shapes[n]), (f.id, n)
 
 
 def test_fixes():

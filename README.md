@@ -43,9 +43,12 @@ cp .env.example .env
 uvicorn web.app:app --reload                                           # веб-интерфейс
 python -m bpmn_gen examples/01_repair_request/input.txt -o out.bpmn    # CLI с LLM
 python -m bpmn_gen --code examples/01_repair_request/code.py -o out.bpmn  # без LLM
+python -m bpmn_gen --code examples/01_repair_request/code.py -o out.bpmn --png  # + картинка
 pytest                                                                 # тесты
 (cd tests/moddle && npm install)                                       # + проверка через bpmn-moddle
 ```
+
+Для `--png` нужен playwright: `pip install playwright && playwright install chromium`.
 
 Файл `out.bpmn` открывается на [demo.bpmn.io](https://demo.bpmn.io)
 (перетащить файл в окно) или в Camunda Modeler.

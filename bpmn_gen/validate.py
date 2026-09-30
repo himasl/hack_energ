@@ -19,6 +19,7 @@ def validate(graph):
     connect_dangling(graph, report)
     put_into_lanes(graph, report)
     make_message_flows(graph, report)
+    close_pools(graph)
     check_reachable(graph, report)
     return report
 
@@ -110,6 +111,28 @@ def make_message_flows(graph, report):
         if a and b and a.id != b.id and f.kind == "sequenceFlow":
             f.kind = "messageFlow"
             report.fixes.append(f"Связь {label(graph, f.source)} → {label(graph, f.target)} между пулами стала сообщением")
+
+
+def close_pools(graph):
+    pools = [c.id for c in graph.containers.values() if c.type == "pool"]
+    if len(pools) < 2:
+        return
+    for node in list(graph.nodes.values()):
+        if node.type in EVENTS or scope(graph, node.id) != graph.root.id:
+            continue
+        flows = [f for f in graph.flows if f.kind == "sequenceFlow"]
+        if not any(f.target == node.id for f in flows):
+            graph.add_flow(pool_event(graph, node.id, "startEvent"), node.id)
+        if not any(f.source == node.id for f in flows):
+            graph.add_flow(node.id, pool_event(graph, node.id, "endEvent"))
+
+
+def pool_event(graph, node_id, type):
+    pool = graph.find_up(node_id, "pool")
+    for other in graph.nodes.values():
+        if other.type == type and graph.find_up(other.id, "pool") == pool:
+            return other.id
+    return graph.add_node(type, "", lane_of(graph, node_id)).id
 
 
 def check_reachable(graph, report):

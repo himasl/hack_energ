@@ -3,6 +3,8 @@ from .graph import EVENTS, GATEWAYS, Layout
 TASK_SIZE = (120, 80)
 EVENT_SIZE = (36, 36)
 GATEWAY_SIZE = (50, 50)
+DUMMY_SIZE = (0, 20)
+LABEL_SIZE = (100, 28)
 COL_GAP = 60
 ROW_GAP = 40
 PAD = 30
@@ -10,6 +12,7 @@ HEADER = 30
 POOL_GAP = 50
 MIN_LANE = 120
 MARGIN = 60
+SWEEPS = 4
 
 
 def size(node):
@@ -41,10 +44,21 @@ def place(graph, scope_id, out, x0, y0):
     bands = band_list(graph, scope_id)
     pooled = bands != [None]
     band = {n.id: band_of(graph, n.id, bands) for n in nodes}
-    slot = assign_slots(nodes, flows, back, rank, order, band, bands)
+
+    chains = {}
+    for f in flows:
+        if (f.source, f.target) in back or f.kind == "messageFlow":
+            continue
+        chain = [f.source]
+        for r in range(rank[f.source] + 1, rank[f.target]):
+            dummy = f"{f.id}:{r}"
+            rank[dummy], band[dummy], sizes[dummy], order[dummy] = r, band[f.source], DUMMY_SIZE, order[f.source] + 0.5
+            chain.append(dummy)
+        chains[f.id] = chain + [f.target]
+    slot = assign_slots(chains, rank, order, band, bands)
 
     ranks = range(max(rank.values(), default=0) + 1)
-    col_w = [max([sizes[i][0] for i in ids if rank[i] == r], default=0) for r in ranks]
+    col_w = [max([sizes[i][0] for i in rank if rank[i] == r], default=0) for r in ranks]
     col_x, x = [], x0 + (HEADER + PAD if pooled else PAD)
     for w in col_w:
         col_x.append(x)
@@ -52,7 +66,7 @@ def place(graph, scope_id, out, x0, y0):
     width = x - x0
 
     slot_h = {b: [] for b in bands}
-    for i in ids:
+    for i in rank:
         rows = slot_h[band[i]]
         rows.extend([0] * (slot[i] + 1 - len(rows)))
         rows[slot[i]] = max(rows[slot[i]], sizes[i][1])
@@ -68,33 +82,44 @@ def place(graph, scope_id, out, x0, y0):
         band_y[b], y, last_pool = y, y + band_h[b], pool
     height = y - y0
 
-    for n in nodes:
-        w, h = sizes[n.id]
-        r, s, b = rank[n.id], slot[n.id], band[n.id]
+    boxes = {}
+    for i in rank:
+        w, h = sizes[i]
+        r, s, b = rank[i], slot[i], band[i]
         rows = slot_h[b]
-        top = band_y[b] + PAD + sum(rows[:s]) + ROW_GAP * s + (rows[s] - h) / 2
-        out.shapes[n.id] = (col_x[r] + (col_w[r] - w) / 2, top, w, h)
+        center = band_y[b] + PAD + sum(rows[:s]) + ROW_GAP * s + rows[s] / 2
+        if i in ids:
+            boxes[i] = (col_x[r] + (col_w[r] - w) / 2, center - h / 2, w, h)
+        else:
+            boxes[i] = (col_x[r], center, col_w[r], 0)
+
+    for n in nodes:
+        out.shapes[n.id] = boxes[n.id]
         if n.type == "subProcess":
-            place(graph, n.id, out, *out.shapes[n.id][:2])
+            place(graph, n.id, out, *boxes[n.id][:2])
 
     if pooled:
         add_pools(graph, bands, band_y, band_h, out, x0, width)
     for f in flows:
-        floor = None
-        if (f.source, f.target) in back or out.shapes[f.target][0] <= out.shapes[f.source][0]:
-            floor = lowest(out.shapes, ids, f, band_y[band[f.target]], band_h[band[f.target]])
-        out.edges[f.id] = route(graph, f, out.shapes, floor)
+        if f.id in chains:
+            out.edges[f.id] = route(graph, f, boxes, chains[f.id][1:-1])
+        elif f.kind == "messageFlow":
+            out.edges[f.id] = message_route(boxes[f.source], boxes[f.target])
+        else:
+            floor = lowest(boxes, ids, f, band_y[band[f.target]], band_h[band[f.target]])
+            out.edges[f.id] = back_route(boxes[f.source], boxes[f.target], floor)
+    for n in nodes:
+        if n.type in GATEWAYS and n.name:
+            out.labels[n.id] = gateway_label(graph, n.id, boxes[n.id], out.edges)
     return width, height
 
 
-def lowest(shapes, ids, flow, band_top, band_height):
-    left = shapes[flow.target][0]
-    right = shapes[flow.source][0] + shapes[flow.source][2]
-    bottoms = [
-        y + h for x, y, w, h in (shapes[i] for i in ids)
-        if x < right and x + w > left and band_top <= y < band_top + band_height
-    ]
-    return max(bottoms) + 20
+def gateway_label(graph, node_id, box, edges):
+    x, y, w, h = box
+    ends = [edges[f.id][0] for f in graph.outgoing(node_id)] + [edges[f.id][-1] for f in graph.incoming(node_id)]
+    below_used = any(abs(py - (y + h)) < 1 for px, py in ends)
+    top = y - 8 - LABEL_SIZE[1] if below_used else y + h + 8
+    return (x + w / 2 - LABEL_SIZE[0] / 2, top, *LABEL_SIZE)
 
 
 def measure(graph, node_id):
@@ -131,6 +156,9 @@ def ranking(nodes, flows):
         for v in succ[u]:
             if (u, v) not in back:
                 rank[v] = max(rank[v], rank[u] + 1)
+    for u in succ:
+        if u not in targets and succ[u]:
+            rank[u] = min(rank[v] for v in succ[u]) - 1
     return rank, order, back
 
 
@@ -157,23 +185,43 @@ def pool_of(graph, band):
     return box.parent if box.type == "lane" else box.id
 
 
-def assign_slots(nodes, flows, back, rank, order, band, bands):
-    preds = {n.id: [] for n in nodes}
-    for f in flows:
-        if (f.source, f.target) not in back and f.kind == "sequenceFlow":
-            preds[f.target].append(f.source)
+def assign_slots(chains, rank, order, band, bands):
+    preds = {i: [] for i in rank}
+    succs = {i: [] for i in rank}
+    for chain in chains.values():
+        for a, b in zip(chain, chain[1:]):
+            preds[b].append(a)
+            succs[a].append(b)
+
+    band_index = {b: k for k, b in enumerate(bands)}
+    ranks = range(max(rank.values(), default=0) + 1)
+    cells = {(r, b): sorted((i for i in rank if rank[i] == r and band[i] == b), key=order.get) for r in ranks for b in bands}
+    index = {i: k for cell in cells.values() for k, i in enumerate(cell)}
+
+    def pos(i):
+        return band_index[band[i]] * 1000 + index[i]
+
+    def sweep(rank_order, neighbours):
+        for r in rank_order:
+            for b in bands:
+                cell = cells[(r, b)]
+                weight = {i: sum(map(pos, neighbours[i])) / len(neighbours[i]) if neighbours[i] else pos(i) for i in cell}
+                cell.sort(key=lambda i: (weight[i], order[i]))
+                index.update({i: k for k, i in enumerate(cell)})
+
+    for _ in range(SWEEPS):
+        sweep(ranks, preds)
+        sweep(reversed(ranks), succs)
 
     slot = {}
-
-    def key(i):
-        above = [slot[p] for p in preds[i] if p in slot and band[p] == band[i]]
-        return (sum(above) / len(above) if above else 0, order[i])
-
-    for r in range(max(rank.values(), default=0) + 1):
+    for r in ranks:
         for b in bands:
-            cell = sorted((n.id for n in nodes if rank[n.id] == r and band[n.id] == b), key=key)
-            for s, i in enumerate(cell):
-                slot[i] = s
+            last = -1
+            for i in cells[(r, b)]:
+                same = [slot[p] for p in preds[i] if band[p] == b]
+                want = round(sum(same) / len(same)) if same else 0
+                slot[i] = max(last + 1, want)
+                last = slot[i]
     return slot
 
 
@@ -189,26 +237,54 @@ def add_pools(graph, bands, band_y, band_h, out, x0, width):
                 out.shapes[b] = (x0 + HEADER, band_y[b], width - HEADER, band_h[b])
 
 
-def route(graph, flow, shapes, floor):
-    sx, sy, sw, sh = shapes[flow.source]
-    tx, ty, tw, th = shapes[flow.target]
-    scx, scy, tcx, tcy = sx + sw / 2, sy + sh / 2, tx + tw / 2, ty + th / 2
+def route(graph, flow, boxes, via):
+    sx, sy, sw, sh = boxes[flow.source]
+    tx, ty, tw, th = boxes[flow.target]
+    scy, tcy = sy + sh / 2, ty + th / 2
+    first = boxes[via[0]][1] if via else tcy
 
-    if flow.kind == "messageFlow":
-        start, end = (sy + sh, ty) if tcy > scy else (sy, ty + th)
-        mid = (start + end) / 2
-        return [(scx, start), (scx, mid), (tcx, mid), (tcx, end)]
-    if floor is not None:
-        gap = sx + sw + COL_GAP / 2
-        return [(sx + sw, scy), (gap, scy), (gap, floor), (tcx, floor), (tcx, ty + th)]
-    if abs(scy - tcy) < 1:
-        return [(sx + sw, scy), (tx, tcy)]
-    if graph.nodes[flow.source].type in GATEWAYS:
-        return [(scx, sy if tcy < scy else sy + sh), (scx, tcy), (tx, tcy)]
-    if graph.nodes[flow.target].type in GATEWAYS:
-        return [(sx + sw, scy), (tcx, scy), (tcx, ty if scy < tcy else ty + th)]
-    mid = tx - COL_GAP / 2
-    return [(sx + sw, scy), (mid, scy), (mid, tcy), (tx, tcy)]
+    if graph.nodes[flow.source].type in GATEWAYS and abs(first - scy) >= 1:
+        points = [(sx + sw / 2, sy if first < scy else sy + sh), (sx + sw / 2, first)]
+    else:
+        points = [(sx + sw, scy)]
+    level = points[-1][1]
+
+    for dummy in via:
+        left, y = boxes[dummy][:2]
+        if abs(y - level) >= 1:
+            points += [(left - COL_GAP / 2, level), (left - COL_GAP / 2, y)]
+            level = y
+
+    if abs(level - tcy) >= 1:
+        if graph.nodes[flow.target].type in GATEWAYS:
+            return points + [(tx + tw / 2, level), (tx + tw / 2, ty if level < tcy else ty + th)]
+        points += [(tx - COL_GAP / 2, level), (tx - COL_GAP / 2, tcy)]
+    return points + [(tx, tcy)]
+
+
+def message_route(source, target):
+    sx, sy, sw, sh = source
+    tx, ty, tw, th = target
+    start, end = (sy + sh, ty) if ty > sy else (sy, ty + th)
+    mid = (start + end) / 2
+    return [(sx + sw / 2, start), (sx + sw / 2, mid), (tx + tw / 2, mid), (tx + tw / 2, end)]
+
+
+def lowest(boxes, ids, flow, band_top, band_height):
+    left = boxes[flow.target][0]
+    right = boxes[flow.source][0] + boxes[flow.source][2]
+    bottoms = [
+        y + h for x, y, w, h in (boxes[i] for i in ids)
+        if x < right and x + w > left and band_top <= y < band_top + band_height
+    ]
+    return max(bottoms) + 20
+
+
+def back_route(source, target, floor):
+    sx, sy, sw, sh = source
+    tx, ty, tw, th = target
+    gap = sx + sw + COL_GAP / 2
+    return [(sx + sw, sy + sh / 2), (gap, sy + sh / 2), (gap, floor), (tx + tw / 2, floor), (tx + tw / 2, ty + th)]
 
 
 def add_groups(graph, out):

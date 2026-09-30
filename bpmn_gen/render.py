@@ -51,7 +51,7 @@ def render(graph, layout):
     lanes = {}
     for pool in pools:
         members = [c for c in graph.subcontainers(pool.id) if c.type == "lane"]
-        if members:
+        if len(members) > 1:
             lane_set = add(elements[pool.id], "bpmn:laneSet", id=f"LaneSet_{pool.id}")
             for lane in members:
                 lanes[lane.id] = add(lane_set, "bpmn:lane", id=lane.id, name=lane.name)
@@ -67,7 +67,7 @@ def render(graph, layout):
         if node.type == "subProcess":
             elements[node.id] = el
         lane = graph.find_up(node.id, "lane", "subProcess")
-        if lane and lane.type == "lane":
+        if lane and lane.id in lanes:
             add(lanes[lane.id], "bpmn:flowNodeRef").text = node.id
 
     for f in graph.flows:
@@ -87,10 +87,15 @@ def render(graph, layout):
     plane = add(diagram, "bpmndi:BPMNPlane", id="BPMNPlane_1",
                 bpmnElement="Collaboration_1" if pools else main.id)
 
+    def bounds(parent, box):
+        x, y, w, h = box
+        add(parent, "dc:Bounds", x=num(x), y=num(y), width=num(w), height=num(h))
+
     def shape(element_id, **attrs):
-        x, y, w, h = layout.shapes[element_id]
         s = add(plane, "bpmndi:BPMNShape", id=f"{element_id}_di", bpmnElement=element_id, **attrs)
-        add(s, "dc:Bounds", x=num(x), y=num(y), width=num(w), height=num(h))
+        bounds(s, layout.shapes[element_id])
+        if element_id in layout.labels:
+            bounds(add(s, "bpmndi:BPMNLabel"), layout.labels[element_id])
 
     for pool in pools:
         shape(pool.id, isHorizontal="true")

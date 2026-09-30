@@ -35,6 +35,7 @@ class Flow:
 class Layout:
     shapes: dict = field(default_factory=dict)
     edges: dict = field(default_factory=dict)
+    labels: dict = field(default_factory=dict)
 
 
 @dataclass
