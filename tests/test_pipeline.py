@@ -5,6 +5,7 @@ import pytest
 from lxml import etree
 
 from bpmn_gen.pipeline import build_from_code
+from tests.bpmn_moddle import AVAILABLE, moddle_warnings
 from tests.bpmn_xsd import xsd_errors
 
 EXAMPLES = sorted(Path(__file__).parent.parent.glob("examples/*/code.py"))
@@ -80,6 +81,12 @@ def test_valid_bpmn(name):
     elements = {e.get("id") for e in doc.iter() if etree.QName(e).localname in DRAWN}
     drawn = {e.get("bpmnElement") for e in doc.iter() if e.get("bpmnElement")}
     assert drawn - {"Collaboration_1", "Process_1"} == elements
+
+
+@pytest.mark.skipif(not AVAILABLE, reason="нужен node и npm install в tests/moddle")
+@pytest.mark.parametrize("name", CASES)
+def test_bpmn_moddle_reads_without_warnings(name):
+    assert moddle_warnings(build_from_code(CASES[name]).xml) == []
 
 
 @pytest.mark.parametrize("name", CASES)

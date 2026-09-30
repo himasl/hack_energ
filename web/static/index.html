@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Архитектор BPMN-диаграмм</title>
+  <link rel="stylesheet" href="/static/vendor/diagram-js.css">
+  <link rel="stylesheet" href="/static/vendor/bpmn-js.css">
+  <link rel="stylesheet" href="/static/vendor/bpmn-embedded.css">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; height: 100vh; display: flex; flex-direction: column; font: 14px/1.4 system-ui, sans-serif; color: #1f2328; }
+    header { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid #d0d7de; }
+    header h1 { font-size: 16px; margin: 0 auto 0 0; }
+    main { flex: 1; display: flex; min-height: 0; }
+    aside { width: 400px; padding: 16px; display: flex; flex-direction: column; gap: 10px; border-right: 1px solid #d0d7de; overflow: auto; }
+    #canvas { flex: 1; }
+    label { font-weight: 600; }
+    textarea, select { width: 100%; font: inherit; padding: 8px; border: 1px solid #d0d7de; border-radius: 6px; }
+    #text { height: 200px; resize: vertical; }
+    #code { height: 260px; font: 12px/1.4 ui-monospace, monospace; resize: vertical; }
+    button { font: inherit; padding: 7px 14px; border: 1px solid #d0d7de; border-radius: 6px; background: #f6f8fa; cursor: pointer; }
+    button.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+    button:disabled { opacity: .5; cursor: wait; }
+    details summary { cursor: pointer; font-weight: 600; margin-bottom: 8px; }
+    #messages { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+    #messages li { padding: 6px 8px; border-radius: 6px; font-size: 13px; }
+    .error { background: #ffebe9; }
+    .warning { background: #fff8c5; }
+    .fix, .info { background: #ddf4ff; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Архитектор BPMN-диаграмм</h1>
+    <button id="save-bpmn">Скачать .bpmn</button>
+    <button id="save-svg">Скачать .svg</button>
+  </header>
+  <main>
+    <aside>
+      <label for="example">Пример</label>
+      <select id="example"></select>
+      <label for="text">Описание процесса</label>
+      <textarea id="text" placeholder="Диспетчер получает заявку… Если…, то…, иначе…"></textarea>
+      <button id="generate" class="primary">Построить схему</button>
+      <details>
+        <summary>Код на API DIAGRAM</summary>
+        <textarea id="code" spellcheck="false"></textarea>
+        <button id="build">Собрать из кода</button>
+      </details>
+      <ul id="messages"></ul>
+    </aside>
+    <div id="canvas"></div>
+  </main>
+
+  <script src="/static/vendor/bpmn-modeler.production.min.js"></script>
+  <script>
+    const $ = id => document.getElementById(id);
+    const modeler = new BpmnJS({ container: '#canvas', keyboard: { bindTo: document } });
+    let examples = [];
+
+    function showMessages(items) {
+      $('messages').innerHTML = '';
+      for (const [kind, text] of items) {
+        const li = document.createElement('li');
+        li.className = kind;
+        li.textContent = text;
+        $('messages').append(li);
+      }
+    }
+
+    async function post(url, body) {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || response.statusText);
+      return data;
+    }
+
+    async function show(result) {
+      $('code').value = result.code;
+      const items = [
+        ...result.errors.map(t => ['error', t]),
+        ...result.warnings.map(t => ['warning', t]),
+        ...result.fixes.map(t => ['fix', t]),
+      ];
+      if (result.attempts > 1) items.unshift(['info', `Модель исправляла код: попыток ${result.attempts}`]);
+      showMessages(items);
+      if (result.xml) {
+        await modeler.importXML(result.xml);
+        const canvas = modeler.get('canvas');
+        canvas.zoom('fit-viewport', 'auto');
+        canvas.zoom(canvas.zoom() * 0.9, 'auto');
+        canvas.scroll({ dx: 30 });
+      }
+    }
+
+    async function run(button, action) {
+      button.disabled = true;
+      showMessages([['info', 'Строю схему…']]);
+      try {
+        await show(await action());
+      } catch (e) {
+        showMessages([['error', e.message]]);
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    function download(name, content, type) {
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(new Blob([content], { type }));
+      link.download = name;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
+
+    $('generate').onclick = () => run($('generate'), () => post('/api/generate', { text: $('text').value }));
+    $('build').onclick = () => run($('build'), () => post('/api/build', { code: $('code').value }));
+
+    $('save-bpmn').onclick = async () => {
+      const { xml } = await modeler.saveXML({ format: true });
+      download('diagram.bpmn', xml, 'application/xml');
+    };
+    $('save-svg').onclick = async () => {
+      const { svg } = await modeler.saveSVG();
+      download('diagram.svg', svg, 'image/svg+xml');
+    };
+
+    $('example').onchange = () => {
+      const example = examples[$('example').selectedIndex];
+      $('text').value = example.text;
+      $('code').value = example.code;
+      if (example.code) run($('build'), () => post('/api/build', { code: example.code }));
+    };
+
+    fetch('/api/examples').then(r => r.json()).then(items => {
+      examples = items;
+      for (const item of items) $('example').add(new Option(item.name));
+      if (items.length) $('example').onchange();
+    });
+  </script>
+</body>
+</html>

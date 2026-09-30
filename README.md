@@ -3,8 +3,6 @@
 ИИ-помощник, который строит BPMN 2.0 диаграмму по текстовому описанию
 бизнес-процесса. Хакатон «ИИ-ассистенты для энергетики», первый этап.
 
-> Статус: каркас проекта. Разделы, помеченные TODO, заполняются по ходу работы.
-
 ## Как это работает
 
 ```
@@ -21,16 +19,19 @@ LLM отвечает только за смысл: участников, шаг�
 Валидность XML и читаемую компоновку обеспечивает детерминированный код,
 поэтому результат всегда открывается в bpmn.io.
 
+Подробно: [архитектура и план задач](docs/ARCHITECTURE.md).
+
 ## Быстрый старт
 
 ### Docker
 
 ```bash
-cp .env.example .env      # указать LLM_BASE_URL, LLM_API_KEY, LLM_MODEL
 docker compose up --build
 ```
 
-Открыть http://localhost:8000.
+Открыть http://localhost:8000. Для генерации по тексту нужна LLM: скопируйте
+`.env.example` в `.env` и укажите `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`.
+Без неё работают примеры и сборка схемы из кода.
 
 ### Локально
 
@@ -43,6 +44,7 @@ uvicorn web.app:app --reload                                           # веб-
 python -m bpmn_gen examples/01_repair_request/input.txt -o out.bpmn    # CLI с LLM
 python -m bpmn_gen --code examples/01_repair_request/code.py -o out.bpmn  # без LLM
 pytest                                                                 # тесты
+(cd tests/moddle && npm install)                                       # + проверка через bpmn-moddle
 ```
 
 Файл `out.bpmn` открывается на [demo.bpmn.io](https://demo.bpmn.io)
@@ -78,6 +80,7 @@ bpmn_gen/
 web/            FastAPI + интерфейс на bpmn-js
 examples/       входные описания и полученные схемы
 tests/          тесты, XSD BPMN 2.0 от OMG в tests/xsd
+docs/           архитектура и план задач
 ```
 
 ## Примеры
