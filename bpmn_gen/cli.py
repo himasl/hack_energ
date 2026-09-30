@@ -26,6 +26,7 @@ def main():
         return 1
 
     args.output.write_text(result.xml, encoding="utf-8")
-    args.output.with_suffix(".py").write_text(result.code, encoding="utf-8")
+    if not args.code:
+        args.output.with_suffix(".py").write_text(result.code, encoding="utf-8")
     print("Готово:", args.output)
     return 0
