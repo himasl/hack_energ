@@ -1,3 +1,4 @@
+DIAGRAM.set_name('Ремонт оборудования подстанции')
 pool, lanes = DIAGRAM.add_pool(ROOT_PROCESS_ID, ['Диспетчер', 'Мастер участка', 'Бригада'])
 dispatcher, master, crew = lanes
 
@@ -14,6 +15,8 @@ join = DIAGRAM.add_parallel_gateway('', crew)
 repair = DIAGRAM.add_user_task('Выполнить ремонт', crew)
 report = DIAGRAM.add_user_task('Доложить о завершении', crew)
 close = DIAGRAM.add_script_task('Закрыть заявку', dispatcher)
+journal = DIAGRAM.add_data_store('Журнал заявок', dispatcher)
+permit_doc = DIAGRAM.add_data_object('Наряд-допуск', master)
 
 DIAGRAM.add_link(ROOT_START_TASK_ID, register)
 DIAGRAM.add_link(register, assess)
@@ -31,3 +34,6 @@ DIAGRAM.add_link(join, repair)
 DIAGRAM.add_link(repair, report)
 DIAGRAM.add_link(report, close)
 DIAGRAM.add_link(close, ROOT_END_TASK_ID)
+DIAGRAM.add_link(register, journal)
+DIAGRAM.add_link(permit, permit_doc)
+DIAGRAM.add_link(permit_doc, repair)

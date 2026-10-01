@@ -1,4 +1,4 @@
-from .graph import ProcessGraph
+from .graph import DATA, ProcessGraph
 
 
 class Diagram:
@@ -43,5 +43,19 @@ class Diagram:
     def add_group(self, name, parent):
         return self.graph.add_container("group", name, parent).id
 
+    def set_name(self, name):
+        self.graph.root.name = name
+
+    def add_data_object(self, name, parent):
+        return self._add("dataObjectReference", name, parent)
+
+    def add_data_store(self, name, parent):
+        return self._add("dataStoreReference", name, parent)
+
     def add_link(self, source, target, name=""):
-        self.graph.add_flow(source, target, name)
+        kind = "sequenceFlow"
+        if self.graph.node(target).type in DATA:
+            kind = "dataOutputAssociation"
+        elif self.graph.node(source).type in DATA:
+            kind = "dataInputAssociation"
+        self.graph.add_flow(source, target, name, kind)

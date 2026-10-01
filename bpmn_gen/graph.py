@@ -3,6 +3,8 @@ from dataclasses import dataclass, field
 EVENTS = {"startEvent", "endEvent"}
 GATEWAYS = {"exclusiveGateway", "parallelGateway", "inclusiveGateway"}
 TASKS = {"task", "userTask", "scriptTask", "subProcess"}
+DATA = {"dataObjectReference", "dataStoreReference"}
+DATA_FLOWS = {"dataInputAssociation", "dataOutputAssociation"}
 CONTAINERS = {"process", "pool", "lane", "subProcess", "group"}
 
 
@@ -86,11 +88,11 @@ class ProcessGraph:
     def root(self):
         return next(c for c in self.containers.values() if c.parent is None)
 
-    def incoming(self, id):
-        return [f for f in self.flows if f.target == id]
+    def incoming(self, id, kind=None):
+        return [f for f in self.flows if f.target == id and kind in (None, f.kind)]
 
-    def outgoing(self, id):
-        return [f for f in self.flows if f.source == id]
+    def outgoing(self, id, kind=None):
+        return [f for f in self.flows if f.source == id and kind in (None, f.kind)]
 
     def children(self, id):
         return [n for n in self.nodes.values() if n.parent == id]

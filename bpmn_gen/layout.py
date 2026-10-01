@@ -1,8 +1,10 @@
-from .graph import EVENTS, GATEWAYS, Layout
+from .graph import DATA, DATA_FLOWS, EVENTS, GATEWAYS, Layout
 
 TASK_SIZE = (120, 80)
 EVENT_SIZE = (36, 36)
 GATEWAY_SIZE = (50, 50)
+DATA_OBJECT_SIZE = (36, 50)
+DATA_STORE_SIZE = (50, 50)
 DUMMY_SIZE = (0, 20)
 LABEL_SIZE = (100, 28)
 COL_GAP = 60
@@ -13,6 +15,7 @@ POOL_GAP = 50
 MIN_LANE = 120
 MARGIN = 60
 SWEEPS = 4
+SHIFT = 12
 
 
 def size(node):
@@ -20,6 +23,10 @@ def size(node):
         return EVENT_SIZE
     if node.type in GATEWAYS:
         return GATEWAY_SIZE
+    if node.type == "dataObjectReference":
+        return DATA_OBJECT_SIZE
+    if node.type == "dataStoreReference":
+        return DATA_STORE_SIZE
     return TASK_SIZE
 
 
@@ -39,15 +46,27 @@ def place(graph, scope_id, out, x0, y0):
     ids = {n.id for n in nodes}
     flows = [f for f in graph.flows if f.source in ids and f.target in ids]
     sizes = {n.id: measure(graph, n.id) if n.type == "subProcess" else size(n) for n in nodes}
-    rank, order, back = ranking(nodes, flows)
+    steps = [n for n in nodes if n.type not in DATA]
+    rank, order, back = ranking(steps, [f for f in flows if f.kind not in DATA_FLOWS])
 
     bands = band_list(graph, scope_id)
     pooled = bands != [None]
     band = {n.id: band_of(graph, n.id, bands) for n in nodes}
 
+    attached = []
+    for n in nodes:
+        if n.type in DATA:
+            links = [f.source for f in graph.incoming(n.id)] + [f.target for f in graph.outgoing(n.id)]
+            owner = links[0] if links else None
+            rank[n.id] = rank[owner] if owner else 0
+            order[n.id] = order[owner] + 0.25 if owner else len(order)
+            if owner:
+                band[n.id] = band[owner]
+                attached.append([owner, n.id])
+
     chains = {}
     for f in flows:
-        if (f.source, f.target) in back or f.kind == "messageFlow":
+        if (f.source, f.target) in back or f.kind == "messageFlow" or f.kind in DATA_FLOWS:
             continue
         chain = [f.source]
         for r in range(rank[f.source] + 1, rank[f.target]):
@@ -55,7 +74,8 @@ def place(graph, scope_id, out, x0, y0):
             rank[dummy], band[dummy], sizes[dummy], order[dummy] = r, band[f.source], DUMMY_SIZE, order[f.source] + 0.5
             chain.append(dummy)
         chains[f.id] = chain + [f.target]
-    slot = assign_slots(chains, rank, order, band, bands)
+    extras = {n.id for n in nodes if n.type in DATA}
+    slot = assign_slots(list(chains.values()) + attached, rank, order, band, bands, extras)
 
     ranks = range(max(rank.values(), default=0) + 1)
     col_w = [max([sizes[i][0] for i in rank if rank[i] == r], default=0) for r in ranks]
@@ -107,6 +127,8 @@ def place(graph, scope_id, out, x0, y0):
             out.edges[f.id] = route(graph, f, grid, chains[f.id][1:-1])
         elif f.kind == "messageFlow":
             out.edges[f.id] = message_route(f, grid)
+        elif f.kind in DATA_FLOWS:
+            out.edges[f.id] = data_route(f, grid)
         else:
             out.edges[f.id] = back_route(f, grid, band_y[band[f.target]], band_h[band[f.target]])
     for n in nodes:
@@ -186,10 +208,10 @@ def pool_of(graph, band):
     return box.parent if box.type == "lane" else box.id
 
 
-def assign_slots(chains, rank, order, band, bands):
+def assign_slots(chains, rank, order, band, bands, extras):
     preds = {i: [] for i in rank}
     succs = {i: [] for i in rank}
-    for chain in chains.values():
+    for chain in chains:
         for a, b in zip(chain, chain[1:]):
             preds[b].append(a)
             succs[a].append(b)
@@ -218,7 +240,8 @@ def assign_slots(chains, rank, order, band, bands):
     for r in ranks:
         for b in bands:
             last = -1
-            for i in cells[(r, b)]:
+            cell = cells[(r, b)]
+            for i in [i for i in cell if i not in extras] + [i for i in cell if i in extras]:
                 same = [slot[p] for p in preds[i] if band[p] == b]
                 want = round(sum(same) / len(same)) if same else 0
                 slot[i] = max(last + 1, want)
@@ -289,11 +312,29 @@ def message_route(flow, grid):
     start, end = (sy + sh, ty) if down else (sy, ty + th)
     near = grid.rows[flow.source][1] + ROW_GAP / 2 if down else grid.rows[flow.source][0] - ROW_GAP / 2
     far = grid.rows[flow.target][0] - ROW_GAP / 2 if down else grid.rows[flow.target][1] + ROW_GAP / 2
-    gap = grid.right_gap(flow.source) if tx + tw / 2 >= sx + sw / 2 else grid.left_gap(flow.source)
+    gap = grid.right_gap(flow.source) - SHIFT if tx + tw / 2 >= sx + sw / 2 else grid.left_gap(flow.source) + SHIFT
     return [
         (sx + sw / 2, start), (sx + sw / 2, near), (gap, near),
         (gap, far), (tx + tw / 2, far), (tx + tw / 2, end),
     ]
+
+
+def data_route(flow, grid):
+    output = flow.kind == "dataOutputAssociation"
+    data, task = (flow.target, flow.source) if output else (flow.source, flow.target)
+    dx, dy, dw, dh = grid.boxes[data]
+    tx, ty, tw, th = grid.boxes[task]
+    below = ty > dy
+    if grid.rank[data] == grid.rank[task]:
+        top, bottom = (dy + dh, ty) if below else (dy, ty + th)
+        if grid.clear(data, top, bottom):
+            points = [(dx + dw / 2, top), (dx + dw / 2, bottom)]
+            return points[::-1] if output else points
+    right = tx + tw / 2 >= dx + dw / 2
+    edge, gap = (dx + dw, grid.right_gap(data) + SHIFT) if right else (dx, grid.left_gap(data) - SHIFT)
+    far = grid.rows[task][0] - ROW_GAP / 2 if below else grid.rows[task][1] + ROW_GAP / 2
+    points = [(edge, dy + dh / 2), (gap, dy + dh / 2), (gap, far), (tx + tw / 2, far), (tx + tw / 2, ty if below else ty + th)]
+    return points[::-1] if output else points
 
 
 def back_route(flow, grid, band_top, band_height):

@@ -24,6 +24,11 @@ g   = DIAGRAM.add_inclusive_gateway('<вопрос?>', <контейнер>)   #
 grp = DIAGRAM.add_group('<имя>', <контейнер>)
 DIAGRAM.add_link(<откуда>, <куда>)
 DIAGRAM.add_link(<откуда>, <куда>, name='<подпись ветки>')
+DIAGRAM.set_name('<название процесса>')
+doc = DIAGRAM.add_data_object('<документ>', <контейнер>)
+db  = DIAGRAM.add_data_store('<система или база данных>', <контейнер>)
+DIAGRAM.add_link(<задача>, doc)    # задача создаёт документ
+DIAGRAM.add_link(doc, <задача>)    # задача использует документ
 ```
 
 `<контейнер>` — `ROOT_PROCESS_ID`, id дорожки из `lanes`, id группы или подпроцесса.

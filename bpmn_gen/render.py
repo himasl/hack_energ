@@ -1,5 +1,7 @@
 from lxml import etree
 
+from .graph import DATA, DATA_FLOWS
+
 NS = {
     "bpmn": "http://www.omg.org/spec/BPMN/20100524/MODEL",
     "bpmndi": "http://www.omg.org/spec/BPMN/20100524/DI",
@@ -26,6 +28,19 @@ def owner(graph, container_id):
     return next(c.id for c in graph.ancestors(container_id) if c.type in OWNERS)
 
 
+def add_data_links(graph, node, el):
+    inputs = graph.incoming(node.id, "dataInputAssociation")
+    for f in inputs:
+        add(el, "bpmn:property", id=f"Property_{f.id}", name="__targetRef_placeholder")
+    for f in inputs:
+        link = add(el, "bpmn:dataInputAssociation", id=f.id)
+        add(link, "bpmn:sourceRef").text = f.source
+        add(link, "bpmn:targetRef").text = f"Property_{f.id}"
+    for f in graph.outgoing(node.id, "dataOutputAssociation"):
+        link = add(el, "bpmn:dataOutputAssociation", id=f.id)
+        add(link, "bpmn:targetRef").text = f.target
+
+
 def render(graph, layout):
     root = etree.Element(tag("bpmn:definitions"), nsmap=NS, id="Definitions_1",
                          targetNamespace="http://bpmn.io/schema/bpmn")
@@ -40,7 +55,7 @@ def render(graph, layout):
             name = pool.name or (names[0] if len(names) == 1 else main.name)
             add(collab, "bpmn:participant", id=pool.id, name=name, processRef=f"Process_{pool.id}")
         for pool in pools:
-            elements[pool.id] = add(root, "bpmn:process", id=f"Process_{pool.id}", isExecutable="false")
+            elements[pool.id] = add(root, "bpmn:process", id=f"Process_{pool.id}", name=main.name, isExecutable="false")
     else:
         elements[main.id] = add(root, "bpmn:process", id=main.id, name=main.name, isExecutable="false")
 
@@ -57,13 +72,19 @@ def render(graph, layout):
                 lanes[lane.id] = add(lane_set, "bpmn:lane", id=lane.id, name=lane.name)
 
     for node in graph.nodes.values():
-        el = add(home(node.parent), f"bpmn:{node.type}", id=node.id, name=node.name)
-        for f in graph.incoming(node.id):
-            if f.kind == "sequenceFlow":
-                add(el, "bpmn:incoming").text = f.id
-        for f in graph.outgoing(node.id):
-            if f.kind == "sequenceFlow":
-                add(el, "bpmn:outgoing").text = f.id
+        parent = home(node.parent)
+        if node.type == "dataObjectReference":
+            add(parent, "bpmn:dataObject", id=f"DataObject_{node.id}")
+            add(parent, "bpmn:dataObjectReference", id=node.id, name=node.name, dataObjectRef=f"DataObject_{node.id}")
+            continue
+        el = add(parent, f"bpmn:{node.type}", id=node.id, name=node.name)
+        if node.type in DATA:
+            continue
+        for f in graph.incoming(node.id, "sequenceFlow"):
+            add(el, "bpmn:incoming").text = f.id
+        for f in graph.outgoing(node.id, "sequenceFlow"):
+            add(el, "bpmn:outgoing").text = f.id
+        add_data_links(graph, node, el)
         if node.type == "subProcess":
             elements[node.id] = el
         lane = graph.find_up(node.id, "lane", "subProcess")
@@ -71,6 +92,8 @@ def render(graph, layout):
             add(lanes[lane.id], "bpmn:flowNodeRef").text = node.id
 
     for f in graph.flows:
+        if f.kind in DATA_FLOWS:
+            continue
         if f.kind == "messageFlow":
             add(collab, "bpmn:messageFlow", id=f.id, name=f.name, sourceRef=f.source, targetRef=f.target)
         else:

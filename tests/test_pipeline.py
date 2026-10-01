@@ -83,9 +83,32 @@ DIAGRAM.add_link(archive, join)
 DIAGRAM.add_link(join, ROOT_END_TASK_ID)
 """
 
+DOCUMENTS = """
+DIAGRAM.set_name('Технологическое присоединение')
+pool, (client, office) = DIAGRAM.add_pool(ROOT_PROCESS_ID, ['Заявитель', 'Сетевая организация'])
+request = DIAGRAM.add_data_object('Заявка на присоединение', client)
+contract = DIAGRAM.add_data_object('Договор', office)
+crm = DIAGRAM.add_data_store('CRM', office)
+send = DIAGRAM.add_user_task('Подать заявку', client)
+check = DIAGRAM.add_user_task('Проверить заявку', office)
+prepare = DIAGRAM.add_script_task('Подготовить договор', office)
+sign = DIAGRAM.add_user_task('Подписать договор', client)
+DIAGRAM.add_link(ROOT_START_TASK_ID, send)
+DIAGRAM.add_link(send, request)
+DIAGRAM.add_link(send, check)
+DIAGRAM.add_link(request, check)
+DIAGRAM.add_link(check, crm)
+DIAGRAM.add_link(check, prepare)
+DIAGRAM.add_link(prepare, contract)
+DIAGRAM.add_link(contract, sign)
+DIAGRAM.add_link(prepare, sign)
+DIAGRAM.add_link(sign, ROOT_END_TASK_ID)
+"""
+
 DRAWN = {
     "task", "userTask", "scriptTask", "subProcess", "startEvent", "endEvent", "exclusiveGateway",
     "parallelGateway", "inclusiveGateway", "sequenceFlow", "messageFlow", "lane", "participant", "group",
+    "dataObjectReference", "dataStoreReference", "dataInputAssociation", "dataOutputAssociation",
 }
 
 LOOP_CODE = """
@@ -99,7 +122,7 @@ for i, name in enumerate(steps):
 DIAGRAM.add_link(prev, ROOT_END_TASK_ID)
 """
 
-CASES = {"simple": SIMPLE, "loop_code": LOOP_CODE, "same_lane": SAME_LANE, "loop": LOOP, "nested": NESTED, "two_pools": TWO_POOLS}
+CASES = {"simple": SIMPLE, "documents": DOCUMENTS, "loop_code": LOOP_CODE, "same_lane": SAME_LANE, "loop": LOOP, "nested": NESTED, "two_pools": TWO_POOLS}
 CASES.update({p.parent.name: p.read_text(encoding="utf-8") for p in EXAMPLES})
 
 
@@ -170,7 +193,7 @@ def test_edges_do_not_cross_shapes(name):
 
 def test_fixes():
     result = build_from_code(NESTED)
-    assert any("Лишний шаг" in f for f in result.fixes)
+    assert any("Лишний шаг" in w for w in result.warnings)
     assert "messageFlow" in build_from_code(TWO_POOLS).xml
 
 
@@ -180,3 +203,68 @@ def test_code_errors_point_to_line():
     assert build_from_code("import os").errors
     bad = SIMPLE + "sub = DIAGRAM.create_subprocess('П', ROOT_PROCESS_ID)\nt = DIAGRAM.add_task('В', sub)\nDIAGRAM.add_link(a, t)\n"
     assert "границу подпроцесса" in build_from_code(bad).errors[0]
+
+
+def warnings_for(code):
+    return " | ".join(build_from_code(code).warnings)
+
+
+def test_logic_warnings():
+    xor_and = """
+a = DIAGRAM.add_task('Оценить', ROOT_PROCESS_ID)
+x = DIAGRAM.add_exclusive_gateway('Нужен ремонт?', ROOT_PROCESS_ID)
+b = DIAGRAM.add_task('Отремонтировать', ROOT_PROCESS_ID)
+c = DIAGRAM.add_task('Закрыть', ROOT_PROCESS_ID)
+j = DIAGRAM.add_parallel_gateway('', ROOT_PROCESS_ID)
+DIAGRAM.add_link(ROOT_START_TASK_ID, a)
+DIAGRAM.add_link(a, x)
+DIAGRAM.add_link(x, b, name='да')
+DIAGRAM.add_link(x, c)
+DIAGRAM.add_link(b, j)
+DIAGRAM.add_link(c, j)
+DIAGRAM.add_link(j, ROOT_END_TASK_ID)
+"""
+    text = warnings_for(xor_and)
+    assert "подписаны не все ветки" in text
+    assert "будет вечно ждать" in text
+    assert "несколько раз" in warnings_for(xor_and.replace("add_exclusive_gateway", "add_parallel_gateway").replace(
+        "add_parallel_gateway('', ", "add_exclusive_gateway('', "))
+
+    one_branch = """
+x = DIAGRAM.add_exclusive_gateway('Требуется отключение?', ROOT_PROCESS_ID)
+a = DIAGRAM.add_task('Согласовать', ROOT_PROCESS_ID)
+DIAGRAM.add_link(ROOT_START_TASK_ID, x)
+DIAGRAM.add_link(x, a)
+DIAGRAM.add_link(a, ROOT_END_TASK_ID)
+"""
+    assert "только одна ветка" in warnings_for(one_branch)
+
+    documents = """
+a = DIAGRAM.add_task('Составить акт', ROOT_PROCESS_ID)
+b = DIAGRAM.add_task('Проверить смету', ROOT_PROCESS_ID)
+act = DIAGRAM.add_data_object('Акт', ROOT_PROCESS_ID)
+estimate = DIAGRAM.add_data_object('Смета', ROOT_PROCESS_ID)
+lost = DIAGRAM.add_data_object('Протокол', ROOT_PROCESS_ID)
+DIAGRAM.add_link(ROOT_START_TASK_ID, a)
+DIAGRAM.add_link(a, b)
+DIAGRAM.add_link(b, ROOT_END_TASK_ID)
+DIAGRAM.add_link(a, act)
+DIAGRAM.add_link(estimate, b)
+"""
+    text = warnings_for(documents)
+    assert "'Акт' создаётся, но дальше нигде не используется" in text
+    assert "'Смета' используется, но в процессе нигде не создаётся" in text
+    assert "'Протокол' не связан" in text
+    assert build_from_code(documents).xml
+
+
+def test_data_errors():
+    gateway = SIMPLE + "d = DIAGRAM.add_data_object('Акт', ROOT_PROCESS_ID)\ng = DIAGRAM.add_parallel_gateway('', ROOT_PROCESS_ID)\nDIAGRAM.add_link(g, d)\n"
+    assert "только с задачей" in build_from_code(gateway).errors[0]
+    pools = TWO_POOLS + "d = DIAGRAM.add_data_object('Обращение', client)\nDIAGRAM.add_link(call, d)\nDIAGRAM.add_link(d, take)\n"
+    assert "разных пулов" in build_from_code(pools).errors[0]
+
+
+def test_process_name():
+    xml = build_from_code(DOCUMENTS).xml
+    assert 'name="Технологическое присоединение"' in xml
