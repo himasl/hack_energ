@@ -23,15 +23,40 @@ LLM отвечает только за смысл: участников, шаг�
 
 ## Быстрый старт
 
+### Настройка LLM через `.env`
+
+Скопируйте пример окружения:
+
+```bash
+cp .env.example .env
+```
+
+Проверьте значения:
+
+```dotenv
+LLM_BASE_URL=http://localhost:11434/v1
+LLM_API_KEY=changeme
+LLM_MODEL=qwen2.5-coder:14b
+LLM_TEMPERATURE=0.2
+LLM_TIMEOUT=60
+LLM_MAX_REPAIRS=2
+```
+
+- `LLM_BASE_URL` — адрес OpenAI-совместимого провайдера;
+- `LLM_API_KEY` — ключ доступа;
+- `LLM_MODEL` — модель, которую хотите использовать;
+- `LLM_TEMPERATURE` и `LLM_TIMEOUT` — опционально;
+- `LLM_MAX_REPAIRS` — число повторов после первой неудачной генерации.
+
+Модель меняется только через `.env`, без правок кода.
+
 ### Docker
 
 ```bash
 docker compose up --build
 ```
 
-Открыть http://localhost:8000. Для генерации по тексту нужна LLM: скопируйте
-`.env.example` в `.env` и укажите `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`.
-Без неё работают примеры и сборка схемы из кода.
+Открыть http://localhost:8000. Переменные из `.env` передаются в контейнер через `docker-compose.yml`, поэтому при запуске LLM будет доступен в веб-API и CLI.
 
 ### Локально
 

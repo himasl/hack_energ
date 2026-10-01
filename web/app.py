@@ -53,11 +53,14 @@ def generate(body: TextIn):
     if not body.text.strip():
         raise HTTPException(400, "Пустое описание процесса")
     try:
-        return asdict(pipeline.generate(body.text))
-    except NotImplementedError:
-        raise HTTPException(501, "Генерация через LLM ещё не подключена, соберите схему из кода")
-    except Exception as e:
-        raise HTTPException(502, f"Ошибка LLM: {e}")
+        result = pipeline.generate(body.text)
+        return asdict(result)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    except (ConnectionError, PermissionError, RuntimeError) as exc:
+        raise HTTPException(502, str(exc))
+    except Exception as exc:
+        raise HTTPException(500, f"Внутренняя ошибка при генерации: {exc}")
 
 
 @app.post("/api/build")

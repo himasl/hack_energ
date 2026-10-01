@@ -31,12 +31,36 @@ def build_from_code(code):
 
 
 def generate(text):
+    if not text or not text.strip():
+        raise ValueError("Пустое описание процесса")
+
     code, errors = None, None
-    for attempt in range(llm.config()["max_repairs"] + 1):
-        code = llm.generate_code(text, code, errors)
+    max_repairs = llm.config()["max_repairs"]
+
+    for attempt in range(max_repairs + 1):
+        try:
+            code = llm.generate_code(text, code, errors)
+        except Exception as exc:
+            return Result(
+                code=code or "",
+                attempts=attempt + 1,
+                errors=[str(exc)],
+                warnings=[],
+                fixes=[],
+            )
+
         result = build_from_code(code)
         result.attempts = attempt + 1
         if not result.errors:
-            break
+            return result
+
+        if attempt >= max_repairs:
+            result.errors.append(
+                "Не удалось получить корректную схему после нескольких попыток. "
+                "Проверьте описание процесса и попробуйте ещё раз."
+            )
+            return result
+
         errors = result.errors
+
     return result

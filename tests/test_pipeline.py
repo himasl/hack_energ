@@ -258,6 +258,56 @@ DIAGRAM.add_link(estimate, b)
     assert build_from_code(documents).xml
 
 
+def test_pipeline_generate_success(monkeypatch):
+    import bpmn_gen.pipeline as pipeline
+
+    def fake_generate_code(text, previous_code=None, errors=None):
+        return SIMPLE
+
+    monkeypatch.setattr(pipeline.llm, "config", lambda: {"max_repairs": 2})
+    monkeypatch.setattr(pipeline.llm, "generate_code", fake_generate_code)
+
+    result = pipeline.generate("Сделать быстрый пример")
+    assert result.errors == []
+    assert result.xml.startswith("<?xml")
+    assert result.code.strip() == SIMPLE.strip()
+
+
+def test_pipeline_generate_retries_after_error(monkeypatch):
+    import bpmn_gen.pipeline as pipeline
+
+    calls = {"count": 0}
+
+    def fake_generate_code(text, previous_code=None, errors=None):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return "bad = "
+        return SIMPLE
+
+    monkeypatch.setattr(pipeline.llm, "config", lambda: {"max_repairs": 2})
+    monkeypatch.setattr(pipeline.llm, "generate_code", fake_generate_code)
+
+    result = pipeline.generate("Сделать пример с исправлением")
+    assert result.errors == []
+    assert result.attempts == 2
+    assert calls["count"] == 2
+
+
+def test_pipeline_generate_fails_after_retries(monkeypatch):
+    import bpmn_gen.pipeline as pipeline
+
+    def fake_generate_code(text, previous_code=None, errors=None):
+        return "bad = "
+
+    monkeypatch.setattr(pipeline.llm, "config", lambda: {"max_repairs": 2})
+    monkeypatch.setattr(pipeline.llm, "generate_code", fake_generate_code)
+
+    result = pipeline.generate("Сделать невалидный пример")
+    assert result.errors
+    assert any("Не удалось получить корректную схему" in e for e in result.errors)
+    assert result.attempts <= 3
+
+
 def test_data_errors():
     gateway = SIMPLE + "d = DIAGRAM.add_data_object('Акт', ROOT_PROCESS_ID)\ng = DIAGRAM.add_parallel_gateway('', ROOT_PROCESS_ID)\nDIAGRAM.add_link(g, d)\n"
     assert "только с задачей" in build_from_code(gateway).errors[0]

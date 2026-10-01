@@ -16,8 +16,23 @@ def main():
     parser.add_argument("--png", action="store_true", help="сохранить картинку рядом с .bpmn")
     args = parser.parse_args()
 
+    if not args.input.exists():
+        print(f"Файл не найден: {args.input}", file=sys.stderr)
+        return 1
+
     source = args.input.read_text(encoding="utf-8")
-    result = pipeline.build_from_code(source) if args.code else pipeline.generate(source)
+    if not source.strip() and not args.code:
+        print("Пустое описание процесса", file=sys.stderr)
+        return 1
+
+    try:
+        result = pipeline.build_from_code(source) if args.code else pipeline.generate(source)
+    except ValueError as exc:
+        print(f"x {exc}", file=sys.stderr)
+        return 1
+    except Exception as exc:
+        print(f"x {exc}", file=sys.stderr)
+        return 1
 
     for message in result.warnings + result.fixes:
         print("!", message, file=sys.stderr)
