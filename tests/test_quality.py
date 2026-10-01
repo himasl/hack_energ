@@ -1,0 +1,37 @@
+from pathlib import Path
+
+from bpmn_gen import batch
+from bpmn_gen.quality import analyze
+
+ROOT = Path(__file__).parent.parent
+MINIMAL = (Path(__file__).parent / "fixtures" / "minimal.bpmn").read_text(encoding="utf-8")
+
+
+def test_clean_diagram():
+    result = analyze(MINIMAL)
+    assert result["valid"]
+    assert (result["tasks"], result["flows"]) == (1, 2)
+    assert result["overlaps"] == result["edges_through_shapes"] == result["edge_crossings"] == 0
+
+
+def test_detects_overlap():
+    assert analyze(MINIMAL.replace('<dc:Bounds x="392" y="102"', '<dc:Bounds x="320" y="102"'))["overlaps"] == 1
+
+
+def test_detects_edge_through_shape():
+    assert analyze(MINIMAL.replace('<dc:Bounds x="392" y="102"', '<dc:Bounds x="200" y="102"'))["edges_through_shapes"] == 1
+
+
+def test_detects_edge_crossing():
+    crossing = MINIMAL.replace(
+        '<di:waypoint x="340" y="120"/>\n        <di:waypoint x="392" y="120"/>',
+        '<di:waypoint x="200" y="60"/>\n        <di:waypoint x="200" y="200"/>',
+    )
+    assert analyze(crossing)["edge_crossings"] == 1
+
+
+def test_batch_report(tmp_path):
+    rows = batch.run(ROOT / "examples", tmp_path, code=True)
+    assert rows and all(r["valid"] for r in rows)
+    assert (tmp_path / "report.md").exists() and (tmp_path / "report.json").exists()
+    assert (tmp_path / f"{rows[0]['name']}.bpmn").exists()

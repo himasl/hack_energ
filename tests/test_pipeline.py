@@ -6,7 +6,7 @@ from lxml import etree
 
 from bpmn_gen.pipeline import build_from_code
 from tests.bpmn_moddle import AVAILABLE, moddle_warnings
-from tests.bpmn_xsd import xsd_errors
+from bpmn_gen.quality import xsd_errors
 
 EXAMPLES = sorted(Path(__file__).parent.parent.glob("examples/*/code.py"))
 
