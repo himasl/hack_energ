@@ -111,8 +111,11 @@ python -m bpmn_gen examples/ -o out/ --code     # по готовому коду
 замене модели.
 
 ```bash
-python -m bpmn_gen bench/ -o out/ --model gpt-oss:120b,glm-5.3,kimi-k2.7-code
+python -m bpmn_gen bench/ -o out/ --model gpt-oss:120b,gpt-oss:20b,nemotron-3-nano:30b -j 4
 ```
+
+`-j 4` отправляет до четырёх процессов в модель одновременно, это в несколько раз быстрее.
+Если провайдер ограничивает число одновременных запросов (ошибка 429), уменьшите число.
 
 `bench/` — проверочный набор из 8 процессов с эталонными схемами, см. [bench/](bench/README.md).
 

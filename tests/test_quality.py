@@ -70,3 +70,24 @@ def test_compare_models(tmp_path, monkeypatch):
     monkeypatch.setattr(pipeline.llm, "generate_code", broken)
     results = batch.compare_models(ROOT / "examples", tmp_path, ["paid"])
     assert "1 шт.: Ошибка LLM API: Error code: 402" in results[0]["failure"]
+
+
+def test_parallel_batch_keeps_order(tmp_path, monkeypatch):
+    import time
+
+    from bpmn_gen import pipeline
+
+    codes = {p.read_text(encoding="utf-8"): (p.parent / "code.py").read_text(encoding="utf-8")
+             for p in (ROOT / "bench").glob("*/input.txt")}
+
+    def slow(text, previous_code=None, errors=None):
+        time.sleep(0.3)
+        return codes[text]
+
+    monkeypatch.setattr(pipeline.llm, "config", lambda: {"max_repairs": 2})
+    monkeypatch.setattr(pipeline.llm, "generate_code", slow)
+    started = time.time()
+    rows = batch.run(ROOT / "bench", tmp_path, jobs=8)
+    assert time.time() - started < 1.5
+    assert [r["name"] for r in rows] == sorted(r["name"] for r in rows)
+    assert all(r["valid"] for r in rows)

@@ -1,6 +1,7 @@
 import json
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from . import pipeline
@@ -35,40 +36,51 @@ def case_name(path, folder):
     return str(path.relative_to(folder).with_suffix(""))
 
 
-def run(folder, out, code=False, png=False, label=""):
+def build(path, code):
+    started = time.time()
+    source = path.read_text(encoding="utf-8")
+    try:
+        result = pipeline.build_from_code(source) if code else pipeline.generate(source)
+    except Exception as e:
+        result = pipeline.Result(errors=[f"{type(e).__name__}: {e}"])
+    return result, round(time.time() - started, 2)
+
+
+def run(folder, out, code=False, png=False, label="", jobs=1):
     out.mkdir(parents=True, exist_ok=True)
-    rows = []
     inputs = find_inputs(folder, code)
-    for number, path in enumerate(inputs, 1):
-        name = case_name(path, folder)
-        target = out / f"{name.replace('/', '__')}.bpmn"
-        started = time.time()
-        source = path.read_text(encoding="utf-8")
-        try:
-            result = pipeline.build_from_code(source) if code else pipeline.generate(source)
-        except Exception as e:
-            result = pipeline.Result(errors=[f"{type(e).__name__}: {e}"])
-        row = {"name": name, "seconds": round(time.time() - started, 2), "attempts": result.attempts}
-        row["warnings"] = len(result.warnings)
-        row["blocking"] = len(result.blocking)
-        row["messages"] = result.errors + result.warnings
-        if result.xml:
-            target.write_text(result.xml, encoding="utf-8")
-            if not code:
-                target.with_suffix(".py").write_text(result.code, encoding="utf-8")
-            if png:
-                try:
-                    to_png(result.xml, target.with_suffix(".png"))
-                except Exception as e:
-                    row["messages"].append(f"PNG не сохранён: {e}")
-            row.update(analyze(result.xml))
-        else:
-            row["valid"] = None
-        rows.append(row)
-        status = "построено" if result.xml else "не построено"
-        print(f"[{number}/{len(inputs)}] {label}{name}: {status}, попыток {result.attempts}, {row['seconds']} с", flush=True)
+    rows = [None] * len(inputs)
+    with ThreadPoolExecutor(max_workers=max(jobs, 1)) as pool:
+        futures = {pool.submit(build, path, code): i for i, path in enumerate(inputs)}
+        for done, future in enumerate(as_completed(futures), 1):
+            i = futures[future]
+            result, seconds = future.result()
+            rows[i] = describe(case_name(inputs[i], folder), result, seconds, out, code, png)
+            status = "построено" if result.xml else "не построено"
+            print(f"[{done}/{len(inputs)}] {label}{rows[i]['name']}: {status}, попыток {result.attempts}, {seconds} с", flush=True)
     write_report(rows, out)
     return rows
+
+
+def describe(name, result, seconds, out, code, png):
+    target = out / f"{name.replace('/', '__')}.bpmn"
+    row = {"name": name, "seconds": seconds, "attempts": result.attempts}
+    row["warnings"] = len(result.warnings)
+    row["blocking"] = len(result.blocking)
+    row["messages"] = result.errors + result.warnings
+    if result.xml:
+        target.write_text(result.xml, encoding="utf-8")
+        if not code:
+            target.with_suffix(".py").write_text(result.code, encoding="utf-8")
+        if png:
+            try:
+                to_png(result.xml, target.with_suffix(".png"))
+            except Exception as e:
+                row["messages"].append(f"PNG не сохранён: {e}")
+        row.update(analyze(result.xml))
+    else:
+        row["valid"] = None
+    return row
 
 
 MODEL_COLUMNS = [
@@ -80,7 +92,7 @@ MODEL_COLUMNS = [
     ("warnings", "Предупреждений"),
     ("overlaps", "Наложения"),
     ("edge_crossings", "Пересечения стрелок"),
-    ("seconds", "Время, с"),
+    ("seconds", "Время прогона, с"),
     ("failure", "Почему не построено"),
 ]
 
@@ -93,11 +105,13 @@ def first_failure(rows):
     return f"{len(failed)} шт.: {message[:120]}".replace("|", "/")
 
 
-def compare_models(folder, out, models, png=False):
+def compare_models(folder, out, models, png=False, jobs=1):
     results = []
     for model in models:
         os.environ["LLM_MODEL"] = model
-        rows = run(folder, out / model.replace("/", "_").replace(":", "_"), png=png, label=f"{model} · ")
+        started = time.time()
+        rows = run(folder, out / model.replace("/", "_").replace(":", "_"), png=png, label=f"{model} · ", jobs=jobs)
+        wall = round(time.time() - started, 2)
         total = summary(rows)
         results.append({
             "model": model,
@@ -108,7 +122,7 @@ def compare_models(folder, out, models, png=False):
             "warnings": sum(r["warnings"] for r in rows),
             "overlaps": total["overlaps"],
             "edge_crossings": total["edge_crossings"],
-            "seconds": total["seconds"],
+            "seconds": wall,
             "failure": first_failure(rows),
         })
     lines = [
