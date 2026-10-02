@@ -9,6 +9,7 @@ from tests.bpmn_moddle import AVAILABLE, moddle_warnings
 from bpmn_gen.quality import xsd_errors
 
 EXAMPLES = sorted(Path(__file__).parent.parent.glob("examples/*/code.py"))
+BENCH = sorted(Path(__file__).parent.parent.glob("bench/*/code.py"))
 
 SIMPLE = """
 a = DIAGRAM.add_task('Принять заявку', ROOT_PROCESS_ID)
@@ -139,7 +140,7 @@ DIAGRAM.add_link(repair, ROOT_END_TASK_ID)
 """
 
 CASES = {"simple": SIMPLE, "documents": DOCUMENTS, "loop_code": LOOP_CODE, "same_lane": SAME_LANE, "loop": LOOP, "nested": NESTED, "two_pools": TWO_POOLS, "join_across_lanes": JOIN_ACROSS_LANES}
-CASES.update({p.parent.name: p.read_text(encoding="utf-8") for p in EXAMPLES})
+CASES.update({p.parent.name: p.read_text(encoding="utf-8") for p in EXAMPLES + BENCH})
 
 
 def overlaps(a, b):
@@ -232,6 +233,12 @@ def test_edges_do_not_share_segments(name):
         for a, b in zip(edges[f.id], edges[f.id][1:]):
             for c, d in zip(edges[g.id], edges[g.id][1:]):
                 assert not shared(a, b, c, d), (f.id, g.id)
+
+
+@pytest.mark.parametrize("path", BENCH, ids=lambda p: p.parent.name)
+def test_bench_reference_is_clean(path):
+    result = build_from_code(path.read_text(encoding="utf-8"))
+    assert result.errors == [] and result.blocking == []
 
 
 def test_fixes():
@@ -405,3 +412,36 @@ def test_data_errors():
 def test_process_name():
     xml = build_from_code(DOCUMENTS).xml
     assert 'name="Технологическое присоединение"' in xml
+
+
+ROUND_TRIP = """
+p1, (office,) = DIAGRAM.add_pool(ROOT_PROCESS_ID, ['Сетевая компания'])
+p2, (vendor,) = DIAGRAM.add_pool(ROOT_PROCESS_ID, ['Поставщик'])
+order = DIAGRAM.add_task('Заказать материалы', office)
+ship = DIAGRAM.add_task('Отгрузить материалы', vendor)
+receive = DIAGRAM.add_task('Принять материалы', office)
+DIAGRAM.add_link(ROOT_START_TASK_ID, order)
+DIAGRAM.add_link(order, ship)
+DIAGRAM.add_link(ship, receive)
+DIAGRAM.add_link(receive, ROOT_END_TASK_ID)
+"""
+
+
+def test_pools_wait_for_reply():
+    from bpmn_gen.sandbox import run_code
+    from bpmn_gen.validate import validate
+
+    graph = run_code(ROUND_TRIP).graph
+    report = validate(graph)
+    assert report.warnings == []
+    names = {(graph.nodes[f.source].name, graph.nodes[f.target].name) for f in graph.flows if f.kind == "sequenceFlow"}
+    assert ("Заказать материалы", "Принять материалы") in names
+    office = {n.id for n in graph.nodes.values() if graph.find_up(n.id, "pool").name == "" and n.type == "startEvent"
+              and graph.find_up(n.id, "lane").name == "Сетевая компания"}
+    assert len(office) == 1
+
+
+def test_gateway_message_goes_back_to_llm():
+    code = TWO_POOLS.replace("DIAGRAM.add_link(call, take)", "g = DIAGRAM.add_exclusive_gateway('Срочно?', client)\nDIAGRAM.add_link(call, g)\nDIAGRAM.add_link(g, take, name='да')\nDIAGRAM.add_link(g, ROOT_END_TASK_ID, name='нет')")
+    result = build_from_code(code)
+    assert result.xml and any("соединяет шлюз с другим пулом" in m for m in result.blocking)
