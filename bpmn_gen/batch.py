@@ -1,4 +1,5 @@
 import json
+import os
 import time
 from pathlib import Path
 
@@ -48,6 +49,7 @@ def run(folder, out, code=False, png=False):
             result = pipeline.Result(errors=[f"{type(e).__name__}: {e}"])
         row = {"name": name, "seconds": round(time.time() - started, 2), "attempts": result.attempts}
         row["warnings"] = len(result.warnings)
+        row["blocking"] = len(result.blocking)
         row["messages"] = result.errors + result.warnings
         if result.xml:
             target.write_text(result.xml, encoding="utf-8")
@@ -64,6 +66,51 @@ def run(folder, out, code=False, png=False):
         rows.append(row)
     write_report(rows, out)
     return rows
+
+
+MODEL_COLUMNS = [
+    ("model", "Модель"),
+    ("built", "Построено"),
+    ("valid", "Валидно по XSD"),
+    ("attempts", "Попыток в среднем"),
+    ("blocking", "Логических ошибок осталось"),
+    ("warnings", "Предупреждений"),
+    ("overlaps", "Наложения"),
+    ("edge_crossings", "Пересечения стрелок"),
+    ("seconds", "Время, с"),
+]
+
+
+def compare_models(folder, out, models, png=False):
+    results = []
+    for model in models:
+        os.environ["LLM_MODEL"] = model
+        rows = run(folder, out / model.replace("/", "_").replace(":", "_"), png=png)
+        total = summary(rows)
+        results.append({
+            "model": model,
+            "built": f"{total['built']} из {total['total']}",
+            "valid": total["valid"],
+            "attempts": round(sum(r["attempts"] for r in rows) / max(len(rows), 1), 2),
+            "blocking": sum(r.get("blocking", 0) for r in rows),
+            "warnings": sum(r["warnings"] for r in rows),
+            "overlaps": total["overlaps"],
+            "edge_crossings": total["edge_crossings"],
+            "seconds": total["seconds"],
+        })
+    lines = [
+        "# Сравнение моделей",
+        "",
+        f"Набор: `{folder}`, процессов: {len(rows) if models else 0}. Отчёт по каждой модели — в её папке.",
+        "",
+        "| " + " | ".join(title for _, title in MODEL_COLUMNS) + " |",
+        "| " + " | ".join("---" for _ in MODEL_COLUMNS) + " |",
+    ]
+    lines += ["| " + " | ".join(cell(r[key]) for key, _ in MODEL_COLUMNS) + " |" for r in results]
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "models.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    (out / "models.json").write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
+    return results
 
 
 def summary(rows):

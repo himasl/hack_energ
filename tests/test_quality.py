@@ -45,3 +45,20 @@ def test_batch_report_not_built(tmp_path):
     assert rows[0]["valid"] is None
     report = (tmp_path / "out" / "report.md").read_text(encoding="utf-8")
     assert "Построено: 0 из 1, валидных по XSD: 0" in report
+
+
+def test_compare_models(tmp_path, monkeypatch):
+    import os
+
+    from bpmn_gen import pipeline
+
+    good = (ROOT / "examples/01_repair_request/code.py").read_text(encoding="utf-8")
+
+    def fake(text, previous_code=None, errors=None):
+        return "bad = " if os.environ["LLM_MODEL"] == "flaky" and not errors else good
+
+    monkeypatch.setattr(pipeline.llm, "config", lambda: {"max_repairs": 2})
+    monkeypatch.setattr(pipeline.llm, "generate_code", fake)
+    results = batch.compare_models(ROOT / "examples", tmp_path, ["good", "flaky"])
+    assert [r["attempts"] for r in results] == [1.0, 2.0]
+    assert "| flaky | 1 из 1 |" in (tmp_path / "models.md").read_text(encoding="utf-8")

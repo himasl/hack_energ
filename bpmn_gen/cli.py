@@ -1,4 +1,5 @@
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -15,6 +16,7 @@ def main():
     parser.add_argument("-o", "--output", type=Path)
     parser.add_argument("--code", action="store_true", help="на входе готовый код, без LLM")
     parser.add_argument("--png", action="store_true", help="сохранить картинку рядом с .bpmn")
+    parser.add_argument("--model", help="модель вместо LLM_MODEL; для папки можно несколько через запятую — сравнение моделей")
     args = parser.parse_args()
 
     if not args.input.exists():
@@ -24,6 +26,18 @@ def main():
     if args.png and not png_available():
         print(PNG_HELP, file=sys.stderr)
         return 1
+
+    models = [m.strip() for m in (args.model or "").split(",") if m.strip()]
+    if len(models) == 1:
+        os.environ["LLM_MODEL"] = models[0]
+
+    if args.input.is_dir() and len(models) > 1 and not args.code:
+        out = args.output or Path("out")
+        results = batch.compare_models(args.input, out, models, args.png)
+        for r in results:
+            print(f"{r['model']}: построено {r['built']}, валидных {r['valid']}, попыток в среднем {r['attempts']}")
+        print("Сравнение:", out / "models.md")
+        return 0
 
     if args.input.is_dir():
         out = args.output or Path("out")
