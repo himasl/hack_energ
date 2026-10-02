@@ -1,0 +1,8 @@
+{
+  "name": "bpmn-moddle-check",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "bpmn-moddle": "^9.0.1"
+  }
+}
