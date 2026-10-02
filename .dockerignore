@@ -6,3 +6,13 @@ __pycache__
 .pytest_cache
 out
 node_modules
+tests
+out.bpmn
+out.py
+Dockerfile
+docker-compose.yml
+.gitignore
+.dockerignore
+.idea
+.vscode
+.DS_Store
