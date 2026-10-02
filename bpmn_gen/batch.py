@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from . import pipeline
+from .compare import compare, graph_from_code
 from .export import to_png
 from .quality import analyze
 
@@ -21,6 +22,12 @@ COLUMNS = [
     ("warnings", "Предупреждения"),
     ("attempts", "Попытки"),
     ("seconds", "Время, с"),
+]
+REFERENCE_COLUMNS = [
+    ("participants_found", "Участники эталона, %"),
+    ("steps_found", "Шаги эталона, %"),
+    ("links_found", "Связи эталона, %"),
+    ("steps_precise", "Точность шагов, %"),
 ]
 
 
@@ -56,10 +63,24 @@ def run(folder, out, code=False, png=False, label="", jobs=1):
             i = futures[future]
             result, seconds = future.result()
             rows[i] = describe(case_name(inputs[i], folder), result, seconds, out, code, png)
+            reference = inputs[i].parent / "code.py"
+            if not code and result.code and reference.exists() and inputs[i].name == "input.txt":
+                add_reference(rows[i], result.code, reference)
             status = "построено" if result.xml else "не построено"
             print(f"[{done}/{len(inputs)}] {label}{rows[i]['name']}: {status}, попыток {result.attempts}, {seconds} с", flush=True)
     write_report(rows, out)
     return rows
+
+
+def add_reference(row, code, reference):
+    generated, expected = graph_from_code(code), graph_from_code(reference.read_text(encoding="utf-8"))
+    if generated is None or expected is None:
+        return
+    found = compare(generated, expected)
+    row.update({key: found[key] for key, _ in REFERENCE_COLUMNS})
+    missing = found["missing_participants"] + found["missing_steps"]
+    if missing:
+        row["messages"].append("Нет из эталона: " + ", ".join(f"«{m}»" for m in missing))
 
 
 def describe(name, result, seconds, out, code, png):
@@ -92,9 +113,17 @@ MODEL_COLUMNS = [
     ("warnings", "Предупреждений"),
     ("overlaps", "Наложения"),
     ("edge_crossings", "Пересечения стрелок"),
+    ("participants_found", "Участники эталона, %"),
+    ("steps_found", "Шаги эталона, %"),
+    ("links_found", "Связи эталона, %"),
     ("seconds", "Время прогона, с"),
     ("failure", "Почему не построено"),
 ]
+
+
+def average(rows, key):
+    values = [r[key] for r in rows if r.get(key) is not None]
+    return round(sum(values) / len(values)) if values else None
 
 
 def first_failure(rows):
@@ -122,6 +151,7 @@ def compare_models(folder, out, models, png=False, jobs=1):
             "warnings": sum(r["warnings"] for r in rows),
             "overlaps": total["overlaps"],
             "edge_crossings": total["edge_crossings"],
+            **{key: average(rows, key) for key, _ in REFERENCE_COLUMNS},
             "seconds": wall,
             "failure": first_failure(rows),
         })
@@ -163,18 +193,27 @@ def cell(value):
 
 def write_report(rows, out):
     total = summary(rows)
+    columns = COLUMNS + (REFERENCE_COLUMNS if any("steps_found" in r for r in rows) else [])
     lines = [
         "# Отчёт о качестве диаграмм",
         "",
         f"Построено: {total['built']} из {total['total']}, валидных по XSD: {total['valid']}. "
         f"Наложений: {total['overlaps']}, стрелок сквозь фигуры: {total['edges_through_shapes']}, "
         f"пересечений стрелок: {total['edge_crossings']}. Время: {total['seconds']} с.",
+    ]
+    if columns is not COLUMNS:
+        lines.append(
+            f"Совпадение с эталоном: участники {cell(average(rows, 'participants_found'))}%, "
+            f"шаги {cell(average(rows, 'steps_found'))}%, связи {cell(average(rows, 'links_found'))}%, "
+            f"точность шагов {cell(average(rows, 'steps_precise'))}%."
+        )
+    lines += [
         "",
-        "| " + " | ".join(title for _, title in COLUMNS) + " |",
-        "| " + " | ".join("---" for _ in COLUMNS) + " |",
+        "| " + " | ".join(title for _, title in columns) + " |",
+        "| " + " | ".join("---" for _ in columns) + " |",
     ]
     for row in rows:
-        lines.append("| " + " | ".join(cell(row.get(key)) for key, _ in COLUMNS) + " |")
+        lines.append("| " + " | ".join(cell(row.get(key)) for key, _ in columns) + " |")
     notes = [(row["name"], m) for row in rows for m in row["messages"]]
     if notes:
         lines += ["", "## Ошибки и предупреждения", ""]

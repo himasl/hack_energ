@@ -91,3 +91,20 @@ def test_parallel_batch_keeps_order(tmp_path, monkeypatch):
     assert time.time() - started < 1.5
     assert [r["name"] for r in rows] == sorted(r["name"] for r in rows)
     assert all(r["valid"] for r in rows)
+    assert all(r["steps_found"] == 100 for r in rows)
+    assert "Совпадение с эталоном: участники 100%" in (tmp_path / "report.md").read_text(encoding="utf-8")
+
+
+def test_compare_with_reference():
+    from bpmn_gen.compare import compare, graph_from_code, similarity
+
+    assert similarity("Зарегистрировать заявку", "Регистрация заявки") == 1.0
+    assert similarity("Выполнить работы", "Выполнить ремонт") < 0.6
+    code = (ROOT / "bench/02_permit_to_work/code.py").read_text(encoding="utf-8")
+    reference = graph_from_code(code)
+    assert compare(reference, reference)["steps_found"] == 100
+    worse = code.replace("briefing = DIAGRAM.add_user_task('Провести целевой инструктаж', admitter)\n", "").replace(
+        "DIAGRAM.add_link(check_place, briefing)\nDIAGRAM.add_link(briefing, admit)", "DIAGRAM.add_link(check_place, admit)")
+    found = compare(graph_from_code(worse), reference)
+    assert found["missing_steps"] == ["Провести целевой инструктаж"]
+    assert found["steps_found"] < 100 and found["links_found"] < 100 and found["steps_precise"] == 100
