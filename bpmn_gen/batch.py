@@ -3,6 +3,7 @@ import time
 from pathlib import Path
 
 from . import pipeline
+from .export import to_png
 from .quality import analyze
 
 COLUMNS = [
@@ -53,8 +54,10 @@ def run(folder, out, code=False, png=False):
             if not code:
                 target.with_suffix(".py").write_text(result.code, encoding="utf-8")
             if png:
-                from .export import to_png
-                to_png(result.xml, target.with_suffix(".png"))
+                try:
+                    to_png(result.xml, target.with_suffix(".png"))
+                except Exception as e:
+                    row["messages"].append(f"PNG не сохранён: {e}")
             row.update(analyze(result.xml))
         else:
             row["valid"] = None
