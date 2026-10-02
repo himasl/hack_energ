@@ -550,3 +550,15 @@ def test_reply_only_awaited_when_guaranteed():
     names = {(graph.nodes[f.source].name, graph.nodes[f.target].name) for f in graph.flows if f.kind == "sequenceFlow"}
     assert ("Направить отказ", "Закрыть заявку") not in names
     assert ("Направить согласование", "Закрыть заявку") not in names
+
+
+def test_title_from_description():
+    from bpmn_gen.pipeline import title_from
+
+    assert title_from("Технологическое присоединение к сетям. Заявитель подаёт заявку.") == "Технологическое присоединение к сетям"
+    assert title_from("Инцидент в АИИС КУЭ: перестали поступать данные.") == "Инцидент в АИИС КУЭ"
+    assert title_from("Диспетчер получает заявку о неисправности оборудования подстанции и регистрирует её.") is None
+    result = build_from_code(SIMPLE, "Приём заявки. Оператор принимает заявку.")
+    assert 'name="Приём заявки"' in result.xml
+    named = build_from_code(DOCUMENTS, "Приём заявки. Оператор принимает заявку.")
+    assert 'name="Технологическое присоединение"' in named.xml

@@ -1,4 +1,6 @@
+import re
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from . import llm
 from .layout import layout
@@ -18,6 +20,20 @@ class Result:
     blocking: list = field(default_factory=list)
 
 
+DEFAULT_NAME = "Процесс"
+
+
+def title_from(text):
+    first = re.split(r"[.:!?\n]", text.strip(), maxsplit=1)[0].strip()
+    return first if first and len(first.split()) <= 7 else None
+
+
+def text_near(code_path):
+    path = Path(code_path)
+    near = path.with_name("input.txt")
+    return near.read_text(encoding="utf-8") if path.name == "code.py" and near.exists() else None
+
+
 def build_from_code(code, text=None):
     result = Result(code=code, attempts=1)
     run = run_code(code)
@@ -27,6 +43,9 @@ def build_from_code(code, text=None):
     report = validate(run.graph)
     if text and not report.errors:
         check_language(run.graph, text, report)
+        if run.graph.root.name == DEFAULT_NAME and title_from(text):
+            run.graph.root.name = title_from(text)
+            report.fixes.append(f"Название процесса взято из описания: «{run.graph.root.name}»")
     result.errors, result.warnings, result.fixes = report.errors, report.warnings, report.fixes
     result.blocking = report.blocking
     if not report.errors:

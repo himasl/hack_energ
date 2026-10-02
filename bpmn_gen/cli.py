@@ -54,7 +54,7 @@ def main():
         return 1
 
     try:
-        result = pipeline.build_from_code(source) if args.code else pipeline.generate(source)
+        result = pipeline.build_from_code(source, pipeline.text_near(args.input)) if args.code else pipeline.generate(source)
     except ValueError as exc:
         print(f"x {exc}", file=sys.stderr)
         return 1

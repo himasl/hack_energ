@@ -47,7 +47,7 @@ def build(path, code):
     started = time.time()
     source = path.read_text(encoding="utf-8")
     try:
-        result = pipeline.build_from_code(source) if code else pipeline.generate(source)
+        result = pipeline.build_from_code(source, pipeline.text_near(path)) if code else pipeline.generate(source)
     except Exception as e:
         result = pipeline.Result(errors=[f"{type(e).__name__}: {e}"])
     return result, round(time.time() - started, 2)
