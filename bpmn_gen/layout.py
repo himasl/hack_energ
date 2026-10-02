@@ -122,15 +122,21 @@ def place(graph, scope_id, out, x0, y0):
 
     if pooled:
         add_pools(graph, bands, band_y, band_h, out, x0, width)
+    routed = {}
     for f in flows:
         if f.id in chains:
-            out.edges[f.id] = route(graph, f, grid, chains[f.id][1:-1])
+            routed[f.id] = route(graph, f, grid, chains[f.id][1:-1])
         elif f.kind == "messageFlow":
-            out.edges[f.id] = message_route(f, grid)
-        elif f.kind in DATA_FLOWS:
-            out.edges[f.id] = data_route(f, grid)
-        else:
-            out.edges[f.id] = back_route(f, grid, band_y[band[f.target]], band_h[band[f.target]])
+            routed[f.id] = message_route(f, grid)
+    for f in flows:
+        if f.id not in routed and f.kind not in DATA_FLOWS:
+            options = back_routes(f, grid, band_y[band[f.target]], band_h[band[f.target]])
+            routed[f.id] = best(options, f, grid, routed)
+    data = {f.id: data_routes(f, grid) for f in flows if f.kind in DATA_FLOWS}
+    for f in sorted((f for f in flows if f.id in data), key=lambda f: len(data[f.id])):
+        routed[f.id] = best(data[f.id], f, grid, routed)
+    for f in flows:
+        out.edges[f.id] = routed[f.id]
     for n in nodes:
         if n.type in GATEWAYS and n.name:
             out.labels[n.id] = gateway_label(graph, n.id, boxes[n.id], out.edges)
@@ -328,7 +334,7 @@ def message_route(flow, grid):
     ]
 
 
-def data_route(flow, grid):
+def data_routes(flow, grid):
     output = flow.kind == "dataOutputAssociation"
     data, task = (flow.target, flow.source) if output else (flow.source, flow.target)
     dx, dy, dw, dh = grid.boxes[data]
@@ -338,27 +344,82 @@ def data_route(flow, grid):
         top, bottom = (dy + dh, ty) if below else (dy, ty + th)
         if grid.clear(data, top, bottom):
             points = [(dx + dw / 2, top), (dx + dw / 2, bottom)]
-            return points[::-1] if output else points
-    right = tx + tw / 2 >= dx + dw / 2
-    edge, gap = (dx + dw, grid.right_gap(data) + SHIFT) if right else (dx, grid.left_gap(data) - SHIFT)
-    far = grid.rows[task][0] - ROW_GAP / 2 if below else grid.rows[task][1] + ROW_GAP / 2
-    points = [(edge, dy + dh / 2), (gap, dy + dh / 2), (gap, far), (tx + tw / 2, far), (tx + tw / 2, ty if below else ty + th)]
-    return points[::-1] if output else points
+            return [points[::-1] if output else points]
+    near_right = tx + tw / 2 >= dx + dw / 2
+    options = []
+    for right in (near_right, not near_right):
+        edge, gap = (dx + dw, grid.right_gap(data) + SHIFT) if right else (dx, grid.left_gap(data) - SHIFT)
+        for top_side in (below, not below):
+            far = grid.rows[task][0] - ROW_GAP / 2 if top_side else grid.rows[task][1] + ROW_GAP / 2
+            end = ty if top_side else ty + th
+            points = [(edge, dy + dh / 2), (gap, dy + dh / 2), (gap, far), (tx + tw / 2, far), (tx + tw / 2, end)]
+            options.append(points[::-1] if output else points)
+    return options
 
 
-def back_route(flow, grid, band_top, band_height):
+def data_route(flow, grid):
+    return data_routes(flow, grid)[0]
+
+
+def best(options, flow, grid, routed):
+    def cost(points):
+        segments = list(zip(points, points[1:]))
+        others = [list(zip(p, p[1:])) for p in routed.values()]
+        crossings = sum(1 for s in segments for line in others for t in line if crosses(s, t))
+        shared = sum(1 for s in segments for line in others for t in line if collinear(s, t))
+        through = sum(
+            1 for s in segments for i in grid.ids
+            if i not in (flow.source, flow.target) and through_box(s, grid.boxes[i])
+        )
+        return through * 100 + shared * 10 + crossings
+    return min(options, key=cost)
+
+
+def crosses(s, t):
+    (a, b), (c, d) = s, t
+    if a[1] == b[1] and c[0] == d[0]:
+        (a, b), (c, d) = (c, d), (a, b)
+    if not (a[0] == b[0] and c[1] == d[1]):
+        return False
+    return min(a[1], b[1]) < c[1] < max(a[1], b[1]) and min(c[0], d[0]) < a[0] < max(c[0], d[0])
+
+
+def collinear(s, t):
+    (a, b), (c, d) = s, t
+    axis = 1 if a[0] == b[0] == c[0] == d[0] else 0 if a[1] == b[1] == c[1] == d[1] else None
+    if axis is None:
+        return False
+    return min(max(a[axis], b[axis]), max(c[axis], d[axis])) - max(min(a[axis], b[axis]), min(c[axis], d[axis])) > 1
+
+
+def through_box(s, box):
+    (a, b), (x, y, w, h) = s, (box[0] + 2, box[1] + 2, box[2] - 4, box[3] - 4)
+    if a[1] == b[1]:
+        return y < a[1] < y + h and max(a[0], b[0]) > x and min(a[0], b[0]) < x + w
+    if a[0] == b[0]:
+        return x < a[0] < x + w and max(a[1], b[1]) > y and min(a[1], b[1]) < y + h
+    return False
+
+
+def back_routes(flow, grid, band_top, band_height):
     sx, sy, sw, sh = grid.boxes[flow.source]
     tx, ty, tw, th = grid.boxes[flow.target]
     exit_x, entry_x = grid.right_gap(flow.source) - SHIFT / 2, grid.left_gap(flow.target)
-    bottoms = [
-        y + h for x, y, w, h in (grid.boxes[i] for i in grid.ids)
+    inside = [
+        (y, y + h) for x, y, w, h in (grid.boxes[i] for i in grid.ids)
         if x < exit_x and x + w > entry_x and band_top <= y < band_top + band_height
     ]
-    floor = max(bottoms, default=band_top + band_height - PAD) + ROW_GAP / 2
+    floor = max((b for _, b in inside), default=band_top + band_height - PAD) + ROW_GAP / 2
+    ceiling = min((t for t, _ in inside), default=band_top + PAD) - ROW_GAP / 2
     return [
-        (sx + sw, sy + sh / 2), (exit_x, sy + sh / 2), (exit_x, floor),
-        (entry_x, floor), (entry_x, ty + th / 2), (tx, ty + th / 2),
+        [(sx + sw, sy + sh / 2), (exit_x, sy + sh / 2), (exit_x, level),
+         (entry_x, level), (entry_x, ty + th / 2), (tx, ty + th / 2)]
+        for level in (floor, ceiling)
     ]
+
+
+def back_route(flow, grid, band_top, band_height):
+    return back_routes(flow, grid, band_top, band_height)[0]
 
 
 def add_groups(graph, out):
