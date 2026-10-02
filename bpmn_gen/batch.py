@@ -78,7 +78,16 @@ MODEL_COLUMNS = [
     ("overlaps", "Наложения"),
     ("edge_crossings", "Пересечения стрелок"),
     ("seconds", "Время, с"),
+    ("failure", "Почему не построено"),
 ]
+
+
+def first_failure(rows):
+    failed = [r for r in rows if not r.get("tasks")]
+    if not failed:
+        return None
+    message = next((m for m in failed[0]["messages"]), "")
+    return f"{len(failed)} шт.: {message[:120]}".replace("|", "/")
 
 
 def compare_models(folder, out, models, png=False):
@@ -97,6 +106,7 @@ def compare_models(folder, out, models, png=False):
             "overlaps": total["overlaps"],
             "edge_crossings": total["edge_crossings"],
             "seconds": total["seconds"],
+            "failure": first_failure(rows),
         })
     lines = [
         "# Сравнение моделей",
