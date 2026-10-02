@@ -107,4 +107,15 @@ def test_compare_with_reference():
         "DIAGRAM.add_link(check_place, briefing)\nDIAGRAM.add_link(briefing, admit)", "DIAGRAM.add_link(check_place, admit)")
     found = compare(graph_from_code(worse), reference)
     assert found["missing_steps"] == ["Провести целевой инструктаж"]
-    assert found["steps_found"] < 100 and found["links_found"] < 100 and found["steps_precise"] == 100
+    assert found["steps_found"] < 100 and found["order_kept"] == 100 and found["steps_precise"] == 100
+    swapped = code.replace("DIAGRAM.add_link(admit, work)\nDIAGRAM.add_link(work, hand_over)\nDIAGRAM.add_link(hand_over, close)",
+                           "DIAGRAM.add_link(admit, hand_over)\nDIAGRAM.add_link(hand_over, work)\nDIAGRAM.add_link(work, close)")
+    assert swapped != code and compare(graph_from_code(swapped), reference)["order_kept"] < 100
+
+
+def test_compare_synonyms():
+    from bpmn_gen.compare import similarity
+
+    assert similarity("Отправить заявку на отключение", "Направить заявку на отключение") == 1.0
+    assert similarity("Опубликовать информацию на сайте", "Разместить информацию на сайте") == 1.0
+    assert similarity("Отключить оборудование", "Включить потребителей") == 0.0

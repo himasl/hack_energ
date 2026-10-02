@@ -19,12 +19,26 @@ def stems(name):
     return {w for w in re.findall(r"\w+", name.lower()) if len(w) > 2}
 
 
+SYNONYMS = [
+    {"напра", "отпра", "перед", "высла", "посла"},
+    {"уведо", "опове", "сообщ", "инфор", "извес"},
+    {"согла", "утвер", "одобр"},
+    {"соста", "оформ", "подго", "сформ", "созда"},
+    {"закры", "завер"},
+    {"получ", "приня"},
+    {"выпол", "осуще", "произ"},
+    {"опубл", "разме"},
+]
+
+
 def root(word):
     return word[:min(5, max(3, len(word) - 1))]
 
 
 def same_word(a, b):
-    return root(a) in b or root(b) in a
+    if root(a) in b or root(b) in a:
+        return True
+    return any(a[:5] in group and b[:5] in group for group in SYNONYMS)
 
 
 def similarity(a, b):
@@ -75,6 +89,16 @@ def links(graph):
     return pairs
 
 
+def reachable(graph, start):
+    seen, stack = set(), [start]
+    while stack:
+        for f in graph.outgoing(stack.pop()):
+            if f.kind in LINKS and f.target not in seen:
+                seen.add(f.target)
+                stack.append(f.target)
+    return seen
+
+
 def share(found, total):
     return round(100 * found / total) if total else None
 
@@ -87,14 +111,15 @@ def compare(generated, reference):
     found = match([s.name for s in ref_steps], [s.name for s in gen_steps])
     twin = {ref_steps[i].id: gen_steps[j].id for i, j in found.items()}
 
-    ref_links, gen_links = links(reference), links(generated)
-    kept = sum(1 for a, b in ref_links if (twin.get(a), twin.get(b)) in gen_links)
+    both = [(twin[a], twin[b]) for a, b in links(reference) if a in twin and b in twin]
+    after = {a: reachable(generated, a) for a, _ in both}
+    kept = sum(1 for a, b in both if b in after[a])
 
     return {
         "participants_found": share(len(people), len(ref_people)),
         "steps_found": share(len(found), len(ref_steps)),
         "steps_precise": share(len(found), len(gen_steps)),
-        "links_found": share(kept, len(ref_links)),
+        "order_kept": share(kept, len(both)),
         "missing_participants": [p for i, p in enumerate(ref_people) if i not in people],
         "missing_steps": [s.name for i, s in enumerate(ref_steps) if i not in found],
     }
@@ -108,7 +133,7 @@ def main():
         print("python -m bpmn_gen.compare <папка с результатами> <папка с эталонами>", file=sys.stderr)
         return 1
     results, references = Path(sys.argv[1]), Path(sys.argv[2])
-    print("| Процесс | Участники, % | Шаги, % | Связи, % | Точность шагов, % | Нет из эталона |")
+    print("| Процесс | Участники, % | Шаги, % | Порядок, % | Точность шагов, % | Нет из эталона |")
     print("| --- | --- | --- | --- | --- | --- |")
     for reference in sorted(references.glob("*/code.py")):
         name = reference.parent.name
@@ -120,7 +145,7 @@ def main():
         found = compare(generated, graph_from_code(reference.read_text(encoding="utf-8")))
         missing = ", ".join(found["missing_participants"] + found["missing_steps"]) or "—"
         print(f"| {name} | {found['participants_found']} | {found['steps_found']} | "
-              f"{found['links_found']} | {found['steps_precise']} | {missing} |")
+              f"{found['order_kept']} | {found['steps_precise']} | {missing} |")
     return 0
 
 

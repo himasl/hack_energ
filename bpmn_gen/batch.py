@@ -26,7 +26,7 @@ COLUMNS = [
 REFERENCE_COLUMNS = [
     ("participants_found", "Участники эталона, %"),
     ("steps_found", "Шаги эталона, %"),
-    ("links_found", "Связи эталона, %"),
+    ("order_kept", "Порядок шагов, %"),
     ("steps_precise", "Точность шагов, %"),
 ]
 
@@ -115,7 +115,7 @@ MODEL_COLUMNS = [
     ("edge_crossings", "Пересечения стрелок"),
     ("participants_found", "Участники эталона, %"),
     ("steps_found", "Шаги эталона, %"),
-    ("links_found", "Связи эталона, %"),
+    ("order_kept", "Порядок шагов, %"),
     ("seconds", "Время прогона, с"),
     ("failure", "Почему не построено"),
 ]
@@ -204,7 +204,7 @@ def write_report(rows, out):
     if columns is not COLUMNS:
         lines.append(
             f"Совпадение с эталоном: участники {cell(average(rows, 'participants_found'))}%, "
-            f"шаги {cell(average(rows, 'steps_found'))}%, связи {cell(average(rows, 'links_found'))}%, "
+            f"шаги {cell(average(rows, 'steps_found'))}%, порядок шагов {cell(average(rows, 'order_kept'))}%, "
             f"точность шагов {cell(average(rows, 'steps_precise'))}%."
         )
     lines += [
