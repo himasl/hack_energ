@@ -59,7 +59,10 @@ def test_compare_models(tmp_path, monkeypatch):
 
     monkeypatch.setattr(pipeline.llm, "config", lambda: {"max_repairs": 2})
     monkeypatch.setattr(pipeline.llm, "generate_code", fake)
-    results = batch.compare_models(ROOT / "examples", tmp_path, ["good", "flaky"])
+    one = tmp_path / "cases" / "01_repair_request"
+    one.mkdir(parents=True)
+    (one / "input.txt").write_text((ROOT / "examples/01_repair_request/input.txt").read_text(encoding="utf-8"), encoding="utf-8")
+    results = batch.compare_models(tmp_path / "cases", tmp_path, ["good", "flaky"])
     assert [r["attempts"] for r in results] == [1.0, 2.0]
     assert "| flaky | 1 из 1 |" in (tmp_path / "models.md").read_text(encoding="utf-8")
     assert results[0]["failure"] is None
@@ -68,7 +71,7 @@ def test_compare_models(tmp_path, monkeypatch):
         raise RuntimeError("Ошибка LLM API: Error code: 402")
 
     monkeypatch.setattr(pipeline.llm, "generate_code", broken)
-    results = batch.compare_models(ROOT / "examples", tmp_path, ["paid"])
+    results = batch.compare_models(tmp_path / "cases", tmp_path, ["paid"])
     assert "1 шт.: Ошибка LLM API: Error code: 402" in results[0]["failure"]
 
 

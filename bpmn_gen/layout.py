@@ -145,16 +145,34 @@ def place(graph, scope_id, out, x0, y0):
         out.edges[f.id] = routed[f.id]
     for n in nodes:
         if n.type in GATEWAYS and n.name:
-            out.labels[n.id] = gateway_label(graph, n.id, boxes[n.id], out.edges)
+            out.labels[n.id] = gateway_label(graph, n.id, boxes[n.id], out.edges, {i: boxes[i] for i in ids})
     return width, height
 
 
-def gateway_label(graph, node_id, box, edges):
+def gateway_label(graph, node_id, box, edges, boxes):
     x, y, w, h = box
-    ends = [edges[f.id][0] for f in graph.outgoing(node_id)] + [edges[f.id][-1] for f in graph.incoming(node_id)]
-    below_used = any(abs(py - (y + h)) < 1 for px, py in ends)
-    top = y - 8 - LABEL_SIZE[1] if below_used else y + h + 8
-    return (x + w / 2 - LABEL_SIZE[0] / 2, top, *LABEL_SIZE)
+    width = LABEL_SIZE[0]
+    lines = max(2, -(-len(graph.nodes[node_id].name) * 6 // width))
+    height = lines * 14
+    middle = x + w / 2 - width / 2
+    options = [
+        (middle, y + h + 8), (middle, y - 8 - height),
+        (x + w + 6, y - 8 - height), (x + w + 6, y + h + 8),
+        (x - 6 - width, y - 8 - height), (x - 6 - width, y + h + 8),
+    ]
+    segments = [s for points in edges.values() for s in zip(points, points[1:])]
+    others = [b for i, b in boxes.items() if i != node_id and b[2] > 0 and b[3] > 0]
+
+    def cost(option):
+        label = (*option, width, height)
+        hits = sum(1 for s in segments if through_box(s, label))
+        covers = sum(1 for b in others if overlaps(label, b))
+        return covers * 10 + hits
+    return (*min(options, key=cost), width, height)
+
+
+def overlaps(a, b):
+    return a[0] < b[0] + b[2] and b[0] < a[0] + a[2] and a[1] < b[1] + b[3] and b[1] < a[1] + a[3]
 
 
 def measure(graph, node_id):
@@ -297,7 +315,8 @@ def is_split(graph, node_id):
 
 
 def is_join(graph, node_id):
-    return graph.nodes[node_id].type in GATEWAYS and len(graph.incoming(node_id, "sequenceFlow")) > 1
+    return graph.nodes[node_id].type in GATEWAYS and len(graph.incoming(node_id, "sequenceFlow")) > 1 \
+        and not is_split(graph, node_id)
 
 
 def route(graph, flow, grid, via):
