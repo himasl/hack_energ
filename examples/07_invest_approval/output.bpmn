@@ -163,7 +163,7 @@
       <bpmndi:BPMNShape id="ExclusiveGateway_2_di" bpmnElement="ExclusiveGateway_2" isMarkerVisible="true">
         <dc:Bounds x="1046" y="505" width="50" height="50"/>
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="1021" y="469" width="100" height="28"/>
+          <dc:Bounds x="1102" y="469" width="100" height="28"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="UserTask_5_di" bpmnElement="UserTask_5">

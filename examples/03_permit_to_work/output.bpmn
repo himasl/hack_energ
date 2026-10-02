@@ -1,9 +1,9 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn">
   <bpmn:collaboration id="Collaboration_1">
-    <bpmn:participant id="Pool_1" name="Процесс" processRef="Process_Pool_1"/>
+    <bpmn:participant id="Pool_1" name="Работы в электроустановках по наряду-допуску" processRef="Process_Pool_1"/>
   </bpmn:collaboration>
-  <bpmn:process id="Process_Pool_1" name="Процесс" isExecutable="false">
+  <bpmn:process id="Process_Pool_1" name="Работы в электроустановках по наряду-допуску" isExecutable="false">
     <bpmn:laneSet id="LaneSet_Pool_1">
       <bpmn:lane id="Lane_1" name="Выдающий наряд">
         <bpmn:flowNodeRef>StartEvent_1</bpmn:flowNodeRef>
@@ -152,7 +152,7 @@
       <bpmndi:BPMNShape id="ExclusiveGateway_1_di" bpmnElement="ExclusiveGateway_1" isMarkerVisible="true">
         <dc:Bounds x="396" y="870" width="50" height="50"/>
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="371" y="928" width="100" height="28"/>
+          <dc:Bounds x="452" y="834" width="100" height="28"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="UserTask_2_di" bpmnElement="UserTask_2">
@@ -200,8 +200,9 @@
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
         <di:waypoint x="336" y="130"/>
-        <di:waypoint x="421" y="130"/>
-        <di:waypoint x="421" y="870"/>
+        <di:waypoint x="366" y="130"/>
+        <di:waypoint x="366" y="895"/>
+        <di:waypoint x="396" y="895"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3">
         <di:waypoint x="421" y="870"/>

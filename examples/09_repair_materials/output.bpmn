@@ -1,9 +1,9 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn">
   <bpmn:collaboration id="Collaboration_1">
-    <bpmn:participant id="Pool_1" name="Процесс" processRef="Process_Pool_1"/>
+    <bpmn:participant id="Pool_1" name="Обеспечение ремонта материалами" processRef="Process_Pool_1"/>
   </bpmn:collaboration>
-  <bpmn:process id="Process_Pool_1" name="Процесс" isExecutable="false">
+  <bpmn:process id="Process_Pool_1" name="Обеспечение ремонта материалами" isExecutable="false">
     <bpmn:laneSet id="LaneSet_Pool_1">
       <bpmn:lane id="Lane_1" name="Мастер участка">
         <bpmn:flowNodeRef>StartEvent_1</bpmn:flowNodeRef>
