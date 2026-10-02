@@ -522,3 +522,19 @@ DIAGRAM.add_link(a, ROOT_END_TASK_ID)
     no_exit = SIMPLE + "c = DIAGRAM.add_task('Уведомить', ROOT_PROCESS_ID)\nDIAGRAM.add_link(ROOT_START_TASK_ID, c)\n"
     result = build_from_code(no_exit)
     assert any("'Уведомить' процесс никуда не идёт" in w for w in result.warnings) and result.blocking == []
+
+
+def test_names_in_language_of_description():
+    english = """
+pool, (dispatcher, crew) = DIAGRAM.add_pool(ROOT_PROCESS_ID, ['Dispatcher', 'Crew'])
+a = DIAGRAM.add_task('Register event', dispatcher)
+b = DIAGRAM.add_task('Repair damage', crew)
+DIAGRAM.add_link(ROOT_START_TASK_ID, a)
+DIAGRAM.add_link(a, b)
+DIAGRAM.add_link(b, ROOT_END_TASK_ID)
+"""
+    text = "Диспетчер регистрирует событие, бригада устраняет повреждение."
+    assert any("не на языке описания" in m for m in build_from_code(english, text).blocking)
+    assert build_from_code(english, "Dispatcher registers the event, the crew repairs it.").blocking == []
+    assert build_from_code(english).blocking == []
+    assert build_from_code(SIMPLE, text).blocking == []

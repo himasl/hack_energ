@@ -39,6 +39,22 @@ def validate(graph):
     return report
 
 
+def check_language(graph, text, report):
+    def latin_share(s):
+        letters = [c for c in s if c.isalpha()]
+        return sum(c.isascii() for c in letters) / len(letters) if letters else 0
+
+    if latin_share(text) > 0.5:
+        return
+    names = [n.name for n in graph.nodes.values() if n.name] + [c.name for c in graph.containers.values() if c.name]
+    latin = [name for name in names if latin_share(name) > 0.5]
+    if names and len(latin) * 2 > len(names):
+        report.block(
+            f"Названия написаны не на языке описания: {', '.join(repr(n) for n in latin[:3])}. "
+            f"Пишите названия шагов, участников и документов так же, как в описании процесса"
+        )
+
+
 def scope(graph, node_id):
     return graph.find_up(node_id, "process", "subProcess").id
 

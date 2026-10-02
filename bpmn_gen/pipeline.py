@@ -4,7 +4,7 @@ from . import llm
 from .layout import layout
 from .render import render
 from .sandbox import run_code
-from .validate import validate
+from .validate import check_language, validate
 
 
 @dataclass
@@ -18,13 +18,15 @@ class Result:
     blocking: list = field(default_factory=list)
 
 
-def build_from_code(code):
+def build_from_code(code, text=None):
     result = Result(code=code, attempts=1)
     run = run_code(code)
     if run.error:
         result.errors.append(run.error)
         return result
     report = validate(run.graph)
+    if text and not report.errors:
+        check_language(run.graph, text, report)
     result.errors, result.warnings, result.fixes = report.errors, report.warnings, report.fixes
     result.blocking = report.blocking
     if not report.errors:
@@ -51,7 +53,7 @@ def generate(text):
                 fixes=[],
             )
 
-        result = build_from_code(code)
+        result = build_from_code(code, text)
         result.attempts = attempt + 1
         if not result.errors and (not result.blocking or attempt >= max_repairs):
             return result
