@@ -132,9 +132,15 @@ def place(graph, scope_id, out, x0, y0):
         if f.id not in routed and f.kind not in DATA_FLOWS:
             options = back_routes(f, grid, band_y[band[f.target]], band_h[band[f.target]])
             routed[f.id] = best(options, f, grid, routed)
-    data = {f.id: data_routes(f, grid) for f in flows if f.kind in DATA_FLOWS}
+    links = {(f.source, f.target) for f in flows if f.kind in DATA_FLOWS}
+    data = {
+        f.id: data_routes(f, grid, offset=(SHIFT / 2 if f.kind == "dataInputAssociation" else -SHIFT / 2)
+                          if (f.target, f.source) in links else 0)
+        for f in flows if f.kind in DATA_FLOWS
+    }
     for f in sorted((f for f in flows if f.id in data), key=lambda f: len(data[f.id])):
         routed[f.id] = best(data[f.id], f, grid, routed)
+    separate(flows, routed, grid)
     for f in flows:
         out.edges[f.id] = routed[f.id]
     for n in nodes:
@@ -334,16 +340,17 @@ def message_route(flow, grid):
     ]
 
 
-def data_routes(flow, grid):
+def data_routes(flow, grid, offset=0):
     output = flow.kind == "dataOutputAssociation"
     data, task = (flow.target, flow.source) if output else (flow.source, flow.target)
     dx, dy, dw, dh = grid.boxes[data]
     tx, ty, tw, th = grid.boxes[task]
+    data_x, task_x, middle = dx + dw / 2 + offset, tx + tw / 2 + offset, dy + dh / 2 + offset
     below = ty > dy
     if grid.rank[data] == grid.rank[task]:
         top, bottom = (dy + dh, ty) if below else (dy, ty + th)
         if grid.clear(data, top, bottom):
-            points = [(dx + dw / 2, top), (dx + dw / 2, bottom)]
+            points = [(data_x, top), (data_x, bottom)]
             return [points[::-1] if output else points]
     near_right = tx + tw / 2 >= dx + dw / 2
     options = []
@@ -352,7 +359,7 @@ def data_routes(flow, grid):
         for top_side in (below, not below):
             far = grid.rows[task][0] - ROW_GAP / 2 if top_side else grid.rows[task][1] + ROW_GAP / 2
             end = ty if top_side else ty + th
-            points = [(edge, dy + dh / 2), (gap, dy + dh / 2), (gap, far), (tx + tw / 2, far), (tx + tw / 2, end)]
+            points = [(edge, middle), (gap, middle), (gap, far + offset), (task_x, far + offset), (task_x, end)]
             options.append(points[::-1] if output else points)
     return options
 
@@ -373,6 +380,59 @@ def best(options, flow, grid, routed):
         )
         return through * 100 + shared * 10 + crossings
     return min(options, key=cost)
+
+
+NUDGES = (6, -6, 12, -12, 18, -18)
+
+
+def separate(flows, routed, grid):
+    ends = {f.id: (f.source, f.target) for f in flows}
+
+    def related(a, b):
+        return ends[a][0] == ends[b][0] or ends[a][1] == ends[b][1]
+
+    def clashes(edge_id, segment):
+        for other, points in routed.items():
+            if other == edge_id or related(edge_id, other):
+                continue
+            if any(collinear(segment, t) for t in zip(points, points[1:])):
+                return True
+        return False
+
+    def blocked(edge_id, points):
+        source, target = ends[edge_id]
+        return any(
+            through_box(s, grid.boxes[i]) for s in zip(points, points[1:]) for i in grid.ids
+            if i not in (source, target)
+        )
+
+    def crossings_near(edge_id, points, k):
+        near = list(zip(points[k - 1:k + 3], points[k:k + 3]))
+        return sum(
+            1 for other, line in routed.items() if other != edge_id
+            for t in zip(line, line[1:]) for s in near if crosses(s, t)
+        )
+
+    for flow in flows:
+        points = routed[flow.id]
+        for k in range(1, len(points) - 2):
+            segment = (points[k], points[k + 1])
+            if not clashes(flow.id, segment):
+                continue
+            vertical = points[k][0] == points[k + 1][0]
+            if vertical == (points[k - 1][0] == points[k][0]) or vertical == (points[k + 1][0] == points[k + 2][0]):
+                continue
+            options = []
+            for step in NUDGES:
+                moved = list(points)
+                if vertical:
+                    moved[k], moved[k + 1] = (points[k][0] + step, points[k][1]), (points[k + 1][0] + step, points[k + 1][1])
+                else:
+                    moved[k], moved[k + 1] = (points[k][0], points[k][1] + step), (points[k + 1][0], points[k + 1][1] + step)
+                if not clashes(flow.id, (moved[k], moved[k + 1])) and not blocked(flow.id, moved):
+                    options.append((crossings_near(flow.id, moved, k), abs(step), moved))
+            if options:
+                points = routed[flow.id] = min(options, key=lambda o: o[:2])[2]
 
 
 def crosses(s, t):
