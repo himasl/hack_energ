@@ -497,3 +497,11 @@ def test_far_data_is_shown_twice():
     assert len(refs) == 2 and len(stores) == 1
     assert {r.get("dataStoreRef") for r in refs} == {stores[0].get("id")}
     assert any("показан ещё раз" in f for f in result.fixes)
+
+
+def test_forgotten_step_in_pools_is_reported():
+    code = ROUND_TRIP + """
+lost = DIAGRAM.add_task('Проверить счёт', office)
+DIAGRAM.add_link(lost, receive)
+"""
+    assert any("'Проверить счёт' ничего не ведёт" in w for w in build_from_code(code).warnings)

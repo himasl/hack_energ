@@ -32,7 +32,7 @@ def validate(graph):
     split_far_data(graph, report)
     make_message_flows(graph, report)
     await_replies(graph, report)
-    close_pools(graph)
+    close_pools(graph, report)
     drop_unused_events(graph)
     check_reachable(graph, report)
     check_exits(graph, report)
@@ -301,7 +301,7 @@ def await_replies(graph, report):
             queue += [f.target for f in graph.outgoing(current) if f.kind not in DATA_FLOWS and f.target not in seen]
 
 
-def close_pools(graph):
+def close_pools(graph, report):
     pools = [c.id for c in graph.containers.values() if c.type == "pool"]
     if len(pools) < 2:
         return
@@ -309,6 +309,8 @@ def close_pools(graph):
         if node.type in EVENTS or node.type in DATA or scope(graph, node.id) != graph.root.id:
             continue
         if not graph.incoming(node.id, SEQ):
+            if not graph.incoming(node.id, "messageFlow"):
+                report.warnings.append(f"Обрыв логики: в {label(graph, node.id)} ничего не ведёт, соединено со стартом")
             graph.add_flow(pool_event(graph, node.id, "startEvent"), node.id)
         if not graph.outgoing(node.id, SEQ):
             graph.add_flow(node.id, pool_event(graph, node.id, "endEvent"))
