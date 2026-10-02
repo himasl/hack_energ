@@ -122,7 +122,23 @@ for i, name in enumerate(steps):
 DIAGRAM.add_link(prev, ROOT_END_TASK_ID)
 """
 
-CASES = {"simple": SIMPLE, "documents": DOCUMENTS, "loop_code": LOOP_CODE, "same_lane": SAME_LANE, "loop": LOOP, "nested": NESTED, "two_pools": TWO_POOLS}
+JOIN_ACROSS_LANES = """
+pool, (master, crew) = DIAGRAM.add_pool(ROOT_PROCESS_ID, ['Мастер участка', 'Бригада'])
+fork = DIAGRAM.add_parallel_gateway('', master)
+permit = DIAGRAM.add_user_task('Оформить наряд-допуск', master)
+materials = DIAGRAM.add_user_task('Подготовить материалы', crew)
+join = DIAGRAM.add_parallel_gateway('', master)
+repair = DIAGRAM.add_user_task('Выполнить ремонт', crew)
+DIAGRAM.add_link(ROOT_START_TASK_ID, fork)
+DIAGRAM.add_link(fork, permit)
+DIAGRAM.add_link(fork, materials)
+DIAGRAM.add_link(permit, join)
+DIAGRAM.add_link(materials, join)
+DIAGRAM.add_link(join, repair)
+DIAGRAM.add_link(repair, ROOT_END_TASK_ID)
+"""
+
+CASES = {"simple": SIMPLE, "documents": DOCUMENTS, "loop_code": LOOP_CODE, "same_lane": SAME_LANE, "loop": LOOP, "nested": NESTED, "two_pools": TWO_POOLS, "join_across_lanes": JOIN_ACROSS_LANES}
 CASES.update({p.parent.name: p.read_text(encoding="utf-8") for p in EXAMPLES})
 
 
@@ -189,6 +205,33 @@ def test_edges_do_not_cross_shapes(name):
         for a, b in zip(points, points[1:]):
             for n in others:
                 assert not crosses(a, b, result.shapes[n]), (f.id, n)
+
+
+def shared(a, b, c, d):
+    if a[1] == b[1] == c[1] == d[1]:
+        lo, hi = 0, 0
+    elif a[0] == b[0] == c[0] == d[0]:
+        lo, hi = 1, 1
+    else:
+        return False
+    return min(max(a[lo], b[lo]), max(c[hi], d[hi])) - max(min(a[lo], b[lo]), min(c[hi], d[hi])) > 1
+
+
+@pytest.mark.parametrize("name", CASES)
+def test_edges_do_not_share_segments(name):
+    from bpmn_gen.layout import layout
+    from bpmn_gen.sandbox import run_code
+    from bpmn_gen.validate import validate
+
+    graph = run_code(CASES[name]).graph
+    validate(graph)
+    edges = layout(graph).edges
+    for f, g in combinations(graph.flows, 2):
+        if f.source == g.source or f.target == g.target:
+            continue
+        for a, b in zip(edges[f.id], edges[f.id][1:]):
+            for c, d in zip(edges[g.id], edges[g.id][1:]):
+                assert not shared(a, b, c, d), (f.id, g.id)
 
 
 def test_fixes():

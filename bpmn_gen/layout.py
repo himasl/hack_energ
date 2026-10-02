@@ -280,13 +280,21 @@ class Grid:
         )
 
 
+def is_split(graph, node_id):
+    return graph.nodes[node_id].type in GATEWAYS and len(graph.outgoing(node_id, "sequenceFlow")) > 1
+
+
+def is_join(graph, node_id):
+    return graph.nodes[node_id].type in GATEWAYS and len(graph.incoming(node_id, "sequenceFlow")) > 1
+
+
 def route(graph, flow, grid, via):
     sx, sy, sw, sh = grid.boxes[flow.source]
     tx, ty, tw, th = grid.boxes[flow.target]
     scy, tcy = sy + sh / 2, ty + th / 2
     first = grid.boxes[via[0]][1] if via else tcy
 
-    if graph.nodes[flow.source].type in GATEWAYS and abs(first - scy) >= 1 and grid.clear(flow.source, scy, first):
+    if is_split(graph, flow.source) and abs(first - scy) >= 1 and grid.clear(flow.source, scy, first):
         points = [(sx + sw / 2, sy if first < scy else sy + sh), (sx + sw / 2, first)]
     else:
         points = [(sx + sw, scy)]
@@ -299,7 +307,7 @@ def route(graph, flow, grid, via):
             level = y
 
     if abs(level - tcy) >= 1:
-        if graph.nodes[flow.target].type in GATEWAYS and grid.clear(flow.target, level, tcy):
+        if is_join(graph, flow.target) and grid.clear(flow.target, level, tcy):
             return points + [(tx + tw / 2, level), (tx + tw / 2, ty if level < tcy else ty + th)]
         points += [(grid.left_gap(flow.target), level), (grid.left_gap(flow.target), tcy)]
     return points + [(tx, tcy)]
