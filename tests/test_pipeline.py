@@ -538,3 +538,15 @@ DIAGRAM.add_link(b, ROOT_END_TASK_ID)
     assert build_from_code(english, "Dispatcher registers the event, the crew repairs it.").blocking == []
     assert build_from_code(english).blocking == []
     assert build_from_code(SIMPLE, text).blocking == []
+
+
+def test_reply_only_awaited_when_guaranteed():
+    code = (Path(__file__).parent.parent / "bench/03_outage_approval/code.py").read_text(encoding="utf-8")
+    from bpmn_gen.sandbox import run_code
+    from bpmn_gen.validate import validate
+
+    graph = run_code(code).graph
+    validate(graph)
+    names = {(graph.nodes[f.source].name, graph.nodes[f.target].name) for f in graph.flows if f.kind == "sequenceFlow"}
+    assert ("Направить отказ", "Закрыть заявку") not in names
+    assert ("Направить согласование", "Закрыть заявку") not in names

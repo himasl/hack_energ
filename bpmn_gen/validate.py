@@ -317,7 +317,10 @@ def await_replies(graph, report):
                 report.fixes.append(f"{label(graph, node.id)} → {label(graph, current)}: процесс ждёт ответа из другого пула")
                 break
             seen.add(current)
-            queue += [f.target for f in graph.outgoing(current) if f.kind not in DATA_FLOWS and f.target not in seen]
+            outs = [f for f in graph.outgoing(current) if f.kind not in DATA_FLOWS]
+            if graph.nodes[current].type in ("exclusiveGateway", "inclusiveGateway") and len(outs) > 1:
+                continue
+            queue += [f.target for f in outs if f.target not in seen]
 
 
 def close_pools(graph, report):
