@@ -57,7 +57,7 @@ def run(folder, out, code=False, png=False):
                 to_png(result.xml, target.with_suffix(".png"))
             row.update(analyze(result.xml))
         else:
-            row["valid"] = False
+            row["valid"] = None
         rows.append(row)
     write_report(rows, out)
     return rows
@@ -67,7 +67,8 @@ def summary(rows):
     built = [r for r in rows if "tasks" in r]
     return {
         "total": len(rows),
-        "valid": sum(r["valid"] for r in rows),
+        "built": len(built),
+        "valid": sum(bool(r["valid"]) for r in rows),
         "overlaps": sum(r["overlaps"] for r in built),
         "edges_through_shapes": sum(r["edges_through_shapes"] for r in built),
         "edge_crossings": sum(r["edge_crossings"] for r in built),
@@ -88,7 +89,7 @@ def write_report(rows, out):
     lines = [
         "# Отчёт о качестве диаграмм",
         "",
-        f"Валидных по XSD: {total['valid']} из {total['total']}. "
+        f"Построено: {total['built']} из {total['total']}, валидных по XSD: {total['valid']}. "
         f"Наложений: {total['overlaps']}, стрелок сквозь фигуры: {total['edges_through_shapes']}, "
         f"пересечений стрелок: {total['edge_crossings']}. Время: {total['seconds']} с.",
         "",

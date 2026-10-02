@@ -24,7 +24,7 @@ def main():
         out = args.output or Path("out")
         rows = batch.run(args.input, out, args.code, args.png)
         total = batch.summary(rows)
-        print(f"Валидных: {total['valid']} из {total['total']}, отчёт: {out / 'report.md'}")
+        print(f"Построено: {total['built']} из {total['total']}, валидных: {total['valid']}, отчёт: {out / 'report.md'}")
         return 0 if total["valid"] == total["total"] else 1
 
     args.output = args.output or Path("out.bpmn")

@@ -35,3 +35,13 @@ def test_batch_report(tmp_path):
     assert rows and all(r["valid"] for r in rows)
     assert (tmp_path / "report.md").exists() and (tmp_path / "report.json").exists()
     assert (tmp_path / f"{rows[0]['name']}.bpmn").exists()
+
+
+def test_batch_report_not_built(tmp_path):
+    cases = tmp_path / "cases"
+    cases.mkdir()
+    (cases / "broken.py").write_text("bad = ", encoding="utf-8")
+    rows = batch.run(cases, tmp_path / "out", code=True)
+    assert rows[0]["valid"] is None
+    report = (tmp_path / "out" / "report.md").read_text(encoding="utf-8")
+    assert "Построено: 0 из 1, валидных по XSD: 0" in report
