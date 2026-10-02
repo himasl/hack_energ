@@ -1,0 +1,42 @@
+pool, (issuer, preparer, producer, dispatcher) = DIAGRAM.add_pool(ROOT_PROCESS_ID, ['Выдающий наряд', 'Допускающий', 'Производитель работ', 'Диспетчер'])
+
+create_permit = DIAGRAM.add_user_task('Оформить наряд‑допуск', issuer)
+decision = DIAGRAM.add_exclusive_gateway('Согласован наряд‑допуск?', dispatcher)
+issue_permit = DIAGRAM.add_user_task('Выдать наряд‑допуск', issuer)
+reissue = DIAGRAM.add_user_task('Переоформить наряд‑допуск', issuer)
+
+split = DIAGRAM.add_parallel_gateway('', preparer)
+off_equipment = DIAGRAM.add_script_task('Отключить оборудование', preparer)
+hang_signs = DIAGRAM.add_script_task('Вывесить плакаты', preparer)
+install_ground = DIAGRAM.add_script_task('Установить заземления', preparer)
+join = DIAGRAM.add_parallel_gateway('', preparer)
+
+verify_place = DIAGRAM.add_user_task('Совместно проверить готовность рабочего места', preparer)
+
+instruction = DIAGRAM.add_user_task('Провести целевой инструктаж', producer)
+perform_permit = DIAGRAM.add_user_task('Выполнить допуск', producer)
+
+handover = DIAGRAM.add_user_task('Сдать рабочее место', producer)
+
+close_permit = DIAGRAM.add_script_task('Закрыть наряд‑допуск', issuer)
+inform = DIAGRAM.add_user_task('Сообщить о завершении', issuer)
+
+DIAGRAM.add_link(ROOT_START_TASK_ID, create_permit)
+DIAGRAM.add_link(create_permit, decision)
+DIAGRAM.add_link(decision, issue_permit, name='да')
+DIAGRAM.add_link(decision, reissue, name='нет')
+DIAGRAM.add_link(reissue, decision)
+DIAGRAM.add_link(issue_permit, split)
+DIAGRAM.add_link(split, off_equipment)
+DIAGRAM.add_link(split, hang_signs)
+DIAGRAM.add_link(split, install_ground)
+DIAGRAM.add_link(off_equipment, join)
+DIAGRAM.add_link(hang_signs, join)
+DIAGRAM.add_link(install_ground, join)
+DIAGRAM.add_link(join, verify_place)
+DIAGRAM.add_link(verify_place, instruction)
+DIAGRAM.add_link(instruction, perform_permit)
+DIAGRAM.add_link(perform_permit, handover)
+DIAGRAM.add_link(handover, close_permit)
+DIAGRAM.add_link(close_permit, inform)
+DIAGRAM.add_link(inform, ROOT_END_TASK_ID)
