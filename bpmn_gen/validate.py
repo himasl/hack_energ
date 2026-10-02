@@ -10,6 +10,11 @@ class Report:
     errors: list = field(default_factory=list)
     warnings: list = field(default_factory=list)
     fixes: list = field(default_factory=list)
+    blocking: list = field(default_factory=list)
+
+    def block(self, message):
+        self.warnings.append(message)
+        self.blocking.append(message)
 
 
 def validate(graph):
@@ -110,12 +115,12 @@ def check_join(graph, join, report):
         return
     split = graph.nodes[splits.pop()]
     if split.type == "exclusiveGateway" and join.type == "parallelGateway":
-        report.warnings.append(
+        report.block(
             f"Альтернативные ветки развилки {label(graph, split.id)} сходятся в параллельном шлюзе: "
             f"процесс будет вечно ждать ветку, которая не выполнялась"
         )
     if split.type == "parallelGateway" and join.type == "exclusiveGateway":
-        report.warnings.append(
+        report.block(
             f"Параллельные ветки из {label(graph, split.id)} сходятся в исключающем шлюзе: "
             f"следующий шаг выполнится несколько раз"
         )

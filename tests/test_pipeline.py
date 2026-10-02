@@ -351,6 +351,50 @@ def test_pipeline_generate_fails_after_retries(monkeypatch):
     assert result.attempts <= 3
 
 
+XOR_INTO_AND = """
+a = DIAGRAM.add_task('Оценить', ROOT_PROCESS_ID)
+x = DIAGRAM.add_exclusive_gateway('Нужен ремонт?', ROOT_PROCESS_ID)
+b = DIAGRAM.add_task('Отремонтировать', ROOT_PROCESS_ID)
+j = DIAGRAM.add_parallel_gateway('', ROOT_PROCESS_ID)
+DIAGRAM.add_link(ROOT_START_TASK_ID, a)
+DIAGRAM.add_link(a, x)
+DIAGRAM.add_link(x, b, name='да')
+DIAGRAM.add_link(x, j, name='нет')
+DIAGRAM.add_link(b, j)
+DIAGRAM.add_link(j, ROOT_END_TASK_ID)
+"""
+
+
+def test_deadlock_goes_back_to_llm(monkeypatch):
+    import bpmn_gen.pipeline as pipeline
+
+    seen = []
+
+    def fake_generate_code(text, previous_code=None, errors=None):
+        seen.append(errors)
+        return XOR_INTO_AND if len(seen) == 1 else XOR_INTO_AND.replace("add_parallel_gateway", "add_exclusive_gateway")
+
+    monkeypatch.setattr(pipeline.llm, "config", lambda: {"max_repairs": 2})
+    monkeypatch.setattr(pipeline.llm, "generate_code", fake_generate_code)
+
+    result = pipeline.generate("Процесс с развилкой")
+    assert result.attempts == 2
+    assert "будет вечно ждать" in seen[1][0]
+    assert result.blocking == [] and result.xml
+
+
+def test_deadlock_kept_as_warning_after_retries(monkeypatch):
+    import bpmn_gen.pipeline as pipeline
+
+    monkeypatch.setattr(pipeline.llm, "config", lambda: {"max_repairs": 2})
+    monkeypatch.setattr(pipeline.llm, "generate_code", lambda text, previous_code=None, errors=None: XOR_INTO_AND)
+
+    result = pipeline.generate("Процесс с развилкой")
+    assert result.attempts == 3
+    assert result.errors == [] and result.xml
+    assert any("будет вечно ждать" in w for w in result.warnings)
+
+
 def test_data_errors():
     gateway = SIMPLE + "d = DIAGRAM.add_data_object('Акт', ROOT_PROCESS_ID)\ng = DIAGRAM.add_parallel_gateway('', ROOT_PROCESS_ID)\nDIAGRAM.add_link(g, d)\n"
     assert "только с задачей" in build_from_code(gateway).errors[0]
