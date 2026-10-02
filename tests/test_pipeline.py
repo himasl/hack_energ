@@ -445,3 +445,44 @@ def test_gateway_message_goes_back_to_llm():
     code = TWO_POOLS.replace("DIAGRAM.add_link(call, take)", "g = DIAGRAM.add_exclusive_gateway('Срочно?', client)\nDIAGRAM.add_link(call, g)\nDIAGRAM.add_link(g, take, name='да')\nDIAGRAM.add_link(g, ROOT_END_TASK_ID, name='нет')")
     result = build_from_code(code)
     assert result.xml and any("соединяет шлюз с другим пулом" in m for m in result.blocking)
+
+
+def test_loop_without_exit_and_unreachable():
+    loop = """
+a = DIAGRAM.add_task('Проверить', ROOT_PROCESS_ID)
+b = DIAGRAM.add_task('Исправить', ROOT_PROCESS_ID)
+DIAGRAM.add_link(ROOT_START_TASK_ID, a)
+DIAGRAM.add_link(a, b)
+DIAGRAM.add_link(b, a)
+"""
+    result = build_from_code(loop)
+    assert result.xml and any("цикл без выхода" in m for m in result.blocking)
+
+    island = SIMPLE + """
+c = DIAGRAM.add_task('Согласовать', ROOT_PROCESS_ID)
+d = DIAGRAM.add_task('Доработать', ROOT_PROCESS_ID)
+DIAGRAM.add_link(c, d)
+DIAGRAM.add_link(d, c)
+"""
+    blocking = build_from_code(island).blocking
+    assert any("Недостижимы от старта" in m and "'Согласовать'" in m for m in blocking)
+
+
+def test_inclusive_split_joins():
+    code = """
+g = DIAGRAM.add_inclusive_gateway('Кого уведомить?', ROOT_PROCESS_ID)
+a = DIAGRAM.add_task('Уведомить соцобъекты', ROOT_PROCESS_ID)
+b = DIAGRAM.add_task('Уведомить юрлица', ROOT_PROCESS_ID)
+j = DIAGRAM.add_parallel_gateway('', ROOT_PROCESS_ID)
+DIAGRAM.add_link(ROOT_START_TASK_ID, g)
+DIAGRAM.add_link(g, a, name='соцобъекты')
+DIAGRAM.add_link(g, b, name='юрлица')
+DIAGRAM.add_link(a, j)
+DIAGRAM.add_link(b, j)
+DIAGRAM.add_link(j, ROOT_END_TASK_ID)
+"""
+    assert any("вечно ждать" in m for m in build_from_code(code).blocking)
+    exclusive = code.replace("add_parallel_gateway('', ", "add_exclusive_gateway('', ")
+    assert any("столько раз" in m for m in build_from_code(exclusive).blocking)
+    inclusive = code.replace("add_parallel_gateway('', ", "add_inclusive_gateway('', ")
+    assert build_from_code(inclusive).blocking == []

@@ -34,6 +34,7 @@ def validate(graph):
     close_pools(graph)
     drop_unused_events(graph)
     check_reachable(graph, report)
+    check_exits(graph, report)
     return report
 
 
@@ -120,6 +121,16 @@ def check_join(graph, join, report):
         report.block(
             f"Альтернативные ветки развилки {label(graph, split.id)} сходятся в параллельном шлюзе: "
             f"процесс будет вечно ждать ветку, которая не выполнялась"
+        )
+    if split.type == "inclusiveGateway" and join.type == "parallelGateway":
+        report.block(
+            f"Ветки включающей развилки {label(graph, split.id)} сходятся в параллельном шлюзе: "
+            f"если выполнилась не каждая ветка, процесс будет вечно ждать. Сведите их во включающий шлюз"
+        )
+    if split.type == "inclusiveGateway" and join.type == "exclusiveGateway":
+        report.block(
+            f"Ветки включающей развилки {label(graph, split.id)} сходятся в исключающем шлюзе: "
+            f"следующий шаг выполнится столько раз, сколько веток сработало. Сведите их во включающий шлюз"
         )
     if split.type == "parallelGateway" and join.type == "exclusiveGateway":
         report.block(
@@ -283,6 +294,22 @@ def check_reachable(graph, report):
             if f.target not in seen and f.kind not in DATA_FLOWS:
                 seen.add(f.target)
                 stack.append(f.target)
-    for node in graph.nodes.values():
-        if node.id not in seen and node.type not in DATA:
-            report.warnings.append(f"{label(graph, node.id)} недостижим от старта")
+    lost = [label(graph, n.id) for n in graph.nodes.values() if n.id not in seen and n.type not in DATA]
+    if lost:
+        report.block(f"Недостижимы от старта: {', '.join(lost)}. В эти шаги нельзя попасть ни с одной ветки процесса")
+
+
+def check_exits(graph, report):
+    ends = [n.id for n in graph.nodes.values() if n.type == "endEvent"]
+    seen, stack = set(ends), list(ends)
+    while stack:
+        for f in graph.incoming(stack.pop()):
+            if f.source not in seen and f.kind not in DATA_FLOWS:
+                seen.add(f.source)
+                stack.append(f.source)
+    stuck = [label(graph, n.id) for n in graph.nodes.values() if n.id not in seen and n.type not in DATA]
+    if stuck:
+        report.block(
+            f"Из шагов {', '.join(stuck)} нельзя дойти до завершения: похоже на цикл без выхода. "
+            f"Добавьте ветку, которая выводит из цикла"
+        )
