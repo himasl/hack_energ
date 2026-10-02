@@ -486,3 +486,14 @@ DIAGRAM.add_link(j, ROOT_END_TASK_ID)
     assert any("столько раз" in m for m in build_from_code(exclusive).blocking)
     inclusive = code.replace("add_parallel_gateway('', ", "add_inclusive_gateway('', ")
     assert build_from_code(inclusive).blocking == []
+
+
+def test_far_data_is_shown_twice():
+    code = (Path(__file__).parent.parent / "bench/05_meter_readings/code.py").read_text(encoding="utf-8")
+    result = build_from_code(code)
+    doc = etree.fromstring(result.xml.encode())
+    refs = [e for e in doc.iter() if etree.QName(e).localname == "dataStoreReference"]
+    stores = [e for e in doc.iter() if etree.QName(e).localname == "dataStore"]
+    assert len(refs) == 2 and len(stores) == 1
+    assert {r.get("dataStoreRef") for r in refs} == {stores[0].get("id")}
+    assert any("показан ещё раз" in f for f in result.fixes)

@@ -22,6 +22,7 @@ class Node:
     type: str
     name: str
     parent: str
+    ref: str = ""
 
 
 @dataclass

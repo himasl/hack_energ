@@ -71,15 +71,23 @@ def render(graph, layout):
             for lane in members:
                 lanes[lane.id] = add(lane_set, "bpmn:lane", id=lane.id, name=lane.name)
 
+    stores = set()
     for node in graph.nodes.values():
         parent = home(node.parent)
         if node.type == "dataObjectReference":
-            add(parent, "bpmn:dataObject", id=f"DataObject_{node.id}")
-            add(parent, "bpmn:dataObjectReference", id=node.id, name=node.name, dataObjectRef=f"DataObject_{node.id}")
+            if not node.ref:
+                add(parent, "bpmn:dataObject", id=f"DataObject_{node.id}")
+            add(parent, "bpmn:dataObjectReference", id=node.id, name=node.name,
+                dataObjectRef=f"DataObject_{node.ref or node.id}")
+            continue
+        if node.type == "dataStoreReference":
+            store = f"DataStore_{node.ref or node.id}"
+            if store not in stores:
+                stores.add(store)
+                add(root, "bpmn:dataStore", id=store, name=node.name)
+            add(parent, "bpmn:dataStoreReference", id=node.id, name=node.name, dataStoreRef=store)
             continue
         el = add(parent, f"bpmn:{node.type}", id=node.id, name=node.name)
-        if node.type in DATA:
-            continue
         for f in graph.incoming(node.id, "sequenceFlow"):
             add(el, "bpmn:incoming").text = f.id
         for f in graph.outgoing(node.id, "sequenceFlow"):

@@ -29,6 +29,7 @@ def validate(graph):
     check_data_pools(graph, report)
     if report.errors:
         return report
+    split_far_data(graph, report)
     make_message_flows(graph, report)
     await_replies(graph, report)
     close_pools(graph)
@@ -217,6 +218,50 @@ def check_data_pools(graph, report):
                 f"{label(graph, node.id)} связан с задачами из разных пулов: передачу между пулами "
                 f"показывайте связью между задачами, а документ создайте в каждом пуле отдельно"
             )
+
+
+FAR = 2
+
+
+def steps_between(graph, a, b):
+    seen, frontier, depth = {a}, [a], 0
+    while frontier and depth <= FAR:
+        if b in frontier:
+            return depth
+        depth += 1
+        nxt = []
+        for n in frontier:
+            for f in graph.outgoing(n, SEQ) + graph.incoming(n, SEQ):
+                other = f.target if f.source == n else f.source
+                if other not in seen:
+                    seen.add(other)
+                    nxt.append(other)
+        frontier = nxt
+    return depth
+
+
+def split_far_data(graph, report):
+    for node in [n for n in graph.nodes.values() if n.type in DATA]:
+        links = graph.incoming(node.id) + graph.outgoing(node.id)
+        if len(links) < 2:
+            continue
+        task = lambda f: f.source if f.target == node.id else f.target
+        owners = {node.id: task(links[0])}
+        for f in links[1:]:
+            near = next((c for c, o in owners.items() if steps_between(graph, o, task(f)) <= FAR), None)
+            if near is None:
+                copy = graph.add_node(node.type, node.name, graph.nodes[task(f)].parent)
+                copy.ref = node.ref or node.id
+                owners[copy.id] = task(f)
+                near = copy.id
+                report.fixes.append(
+                    f"{label(graph, node.id)} показан ещё раз рядом с {label(graph, task(f))}, "
+                    f"чтобы связь не тянулась через всю схему"
+                )
+            if f.target == node.id:
+                f.target = near
+            else:
+                f.source = near
 
 
 def make_message_flows(graph, report):
