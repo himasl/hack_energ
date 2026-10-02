@@ -30,7 +30,9 @@ def validate(graph):
     if report.errors:
         return report
     make_message_flows(graph, report)
+    await_replies(graph, report)
     close_pools(graph)
+    drop_unused_events(graph)
     check_reachable(graph, report)
     return report
 
@@ -137,18 +139,28 @@ def drop_empty_gateways(graph, report):
             del graph.nodes[node.id]
 
 
+def many_pools(graph):
+    return sum(c.type == "pool" for c in graph.containers.values()) > 1
+
+
 def connect_dangling(graph, report):
     for scope_id in scopes(graph):
+        if scope_id == graph.root.id and many_pools(graph):
+            continue
         members = [
             n for n in graph.nodes.values()
             if scope(graph, n.id) == scope_id and n.type not in EVENTS and n.type not in DATA
         ]
-        for node in members:
-            if not graph.incoming(node.id, SEQ):
-                graph.add_flow(event(graph, scope_id, "startEvent"), node.id)
+        inner = scope_id != graph.root.id
+        no_in = [n for n in members if not graph.incoming(n.id, SEQ)]
+        no_out = [n for n in members if not graph.outgoing(n.id, SEQ)]
+        for node in no_in:
+            graph.add_flow(event(graph, scope_id, "startEvent"), node.id)
+            if not (inner and len(no_in) == 1):
                 report.warnings.append(f"Обрыв логики: в {label(graph, node.id)} ничего не ведёт, соединено со стартом")
-            if not graph.outgoing(node.id, SEQ):
-                graph.add_flow(node.id, event(graph, scope_id, "endEvent"))
+        for node in no_out:
+            graph.add_flow(node.id, event(graph, scope_id, "endEvent"))
+            if not (inner and len(no_out) == 1):
                 report.warnings.append(f"Обрыв логики: из {label(graph, node.id)} процесс никуда не идёт, соединено с концом")
         start, end = event(graph, scope_id, "startEvent"), event(graph, scope_id, "endEvent")
         if not graph.outgoing(start, SEQ) and not graph.incoming(end, SEQ):
@@ -202,6 +214,35 @@ def make_message_flows(graph, report):
         if a and b and a.id != b.id and f.kind == SEQ:
             f.kind = "messageFlow"
             report.fixes.append(f"Связь {label(graph, f.source)} → {label(graph, f.target)} между пулами стала сообщением")
+            if graph.nodes[f.source].type in GATEWAYS or graph.nodes[f.target].type in GATEWAYS:
+                report.block(
+                    f"Связь {label(graph, f.source)} → {label(graph, f.target)} соединяет шлюз с другим пулом: "
+                    f"сообщение между пулами может идти только от задачи к задаче. Ветку шлюза ведите к задаче "
+                    f"своего пула (например, «Отправить ...»), а от неё — связь в другой пул"
+                )
+
+
+def await_replies(graph, report):
+    if not many_pools(graph):
+        return
+    pool = {n: graph.find_up(n, "pool") for n in graph.nodes}
+    waiting = {
+        n for n in graph.nodes
+        if not graph.incoming(n, SEQ) and graph.incoming(n, "messageFlow") and scope(graph, n) == graph.root.id
+    }
+    for node in list(graph.nodes.values()):
+        if graph.outgoing(node.id, SEQ) or not graph.outgoing(node.id, "messageFlow"):
+            continue
+        seen, queue = {node.id}, [f.target for f in graph.outgoing(node.id, "messageFlow")]
+        while queue:
+            current = queue.pop(0)
+            if current in waiting and pool[current] == pool[node.id]:
+                graph.add_flow(node.id, current)
+                waiting.discard(current)
+                report.fixes.append(f"{label(graph, node.id)} → {label(graph, current)}: процесс ждёт ответа из другого пула")
+                break
+            seen.add(current)
+            queue += [f.target for f in graph.outgoing(current) if f.kind not in DATA_FLOWS and f.target not in seen]
 
 
 def close_pools(graph):
@@ -215,6 +256,15 @@ def close_pools(graph):
             graph.add_flow(pool_event(graph, node.id, "startEvent"), node.id)
         if not graph.outgoing(node.id, SEQ):
             graph.add_flow(node.id, pool_event(graph, node.id, "endEvent"))
+
+
+def drop_unused_events(graph):
+    if not many_pools(graph):
+        return
+    for node in list(graph.nodes.values()):
+        if node.type in EVENTS and scope(graph, node.id) == graph.root.id \
+                and not graph.incoming(node.id) and not graph.outgoing(node.id):
+            del graph.nodes[node.id]
 
 
 def pool_event(graph, node_id, type):
