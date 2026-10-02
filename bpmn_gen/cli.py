@@ -4,14 +4,15 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from . import pipeline
+from . import batch, pipeline
+from .export import PNG_HELP, png_available, to_png
 
 
 def main():
     load_dotenv()
     parser = argparse.ArgumentParser(prog="bpmn_gen")
-    parser.add_argument("input", type=Path)
-    parser.add_argument("-o", "--output", type=Path, default=Path("out.bpmn"))
+    parser.add_argument("input", type=Path, help="файл с описанием или кодом; папка — пакетный прогон")
+    parser.add_argument("-o", "--output", type=Path)
     parser.add_argument("--code", action="store_true", help="на входе готовый код, без LLM")
     parser.add_argument("--png", action="store_true", help="сохранить картинку рядом с .bpmn")
     args = parser.parse_args()
@@ -20,6 +21,18 @@ def main():
         print(f"Файл не найден: {args.input}", file=sys.stderr)
         return 1
 
+    if args.png and not png_available():
+        print(PNG_HELP, file=sys.stderr)
+        return 1
+
+    if args.input.is_dir():
+        out = args.output or Path("out")
+        rows = batch.run(args.input, out, args.code, args.png)
+        total = batch.summary(rows)
+        print(f"Построено: {total['built']} из {total['total']}, валидных: {total['valid']}, отчёт: {out / 'report.md'}")
+        return 0 if total["valid"] == total["total"] else 1
+
+    args.output = args.output or Path("out.bpmn")
     source = args.input.read_text(encoding="utf-8")
     if not source.strip() and not args.code:
         print("Пустое описание процесса", file=sys.stderr)
@@ -46,10 +59,10 @@ def main():
         args.output.with_suffix(".py").write_text(result.code, encoding="utf-8")
     if args.png:
         try:
-            from .export import to_png
-        except ImportError:
-            print("Для --png нужен playwright: pip install playwright && playwright install chromium", file=sys.stderr)
+            to_png(result.xml, args.output.with_suffix(".png"))
+        except Exception as exc:
+            print(f"x Не удалось сохранить PNG: {exc}", file=sys.stderr)
+            print(PNG_HELP, file=sys.stderr)
             return 1
-        to_png(result.xml, args.output.with_suffix(".png"))
     print("Готово:", args.output)
     return 0

@@ -1,3 +1,4 @@
+import importlib.util
 from pathlib import Path
 
 VENDOR = Path(__file__).parent.parent / "web" / "static" / "vendor"
@@ -19,6 +20,13 @@ IMPORT = """async (xml) => {
 }"""
 
 FIT = """(box) => window.modeler.get('canvas').viewbox(box)"""
+
+
+PNG_HELP = "Для --png нужен playwright: pip install playwright && python -m playwright install chromium"
+
+
+def png_available():
+    return importlib.util.find_spec("playwright") is not None
 
 
 def to_png(xml, path, scale=2):

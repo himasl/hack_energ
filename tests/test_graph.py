@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from bpmn_gen.graph import ProcessGraph
-from tests.bpmn_xsd import xsd_errors
+from bpmn_gen.quality import xsd_errors
 
 MINIMAL = (Path(__file__).parent / "fixtures" / "minimal.bpmn").read_text(encoding="utf-8")
 

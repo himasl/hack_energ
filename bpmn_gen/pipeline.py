@@ -15,6 +15,7 @@ class Result:
     errors: list = field(default_factory=list)
     warnings: list = field(default_factory=list)
     fixes: list = field(default_factory=list)
+    blocking: list = field(default_factory=list)
 
 
 def build_from_code(code):
@@ -25,6 +26,7 @@ def build_from_code(code):
         return result
     report = validate(run.graph)
     result.errors, result.warnings, result.fixes = report.errors, report.warnings, report.fixes
+    result.blocking = report.blocking
     if not report.errors:
         result.xml = render(run.graph, layout(run.graph))
     return result
@@ -51,7 +53,7 @@ def generate(text):
 
         result = build_from_code(code)
         result.attempts = attempt + 1
-        if not result.errors:
+        if not result.errors and (not result.blocking or attempt >= max_repairs):
             return result
 
         if attempt >= max_repairs:
@@ -61,6 +63,6 @@ def generate(text):
             )
             return result
 
-        errors = result.errors
+        errors = result.errors or result.blocking
 
     return result

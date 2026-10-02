@@ -73,6 +73,16 @@ pytest                                                                 # тес�
 (cd tests/moddle && npm install)                                       # + проверка через bpmn-moddle
 ```
 
+Пакетный прогон: если передать папку, генератор обработает все описания (`*.txt`,
+или `*.py` с флагом `--code`) и сохранит в `out/` схемы и отчёт `report.md` / `report.json`:
+валидность по XSD, наложения фигур, стрелки сквозь фигуры, пересечения стрелок,
+предупреждения валидатора и время.
+
+```bash
+python -m bpmn_gen examples/ -o out/            # по текстам, нужна LLM
+python -m bpmn_gen examples/ -o out/ --code     # по готовому коду
+```
+
 Для `--png` нужен playwright: `pip install playwright && playwright install chromium`.
 
 Файл `out.bpmn` открывается на [demo.bpmn.io](https://demo.bpmn.io)
@@ -111,13 +121,16 @@ bpmn_gen/
   validate.py   проверки и автопочинка
   layout.py     автоматическая раскладка
   render.py     BPMN 2.0 XML + DI
+  quality.py    проверка по XSD и метрики читаемости
+  batch.py      пакетный прогон по папке с отчётом
+  xsd/          официальная XSD BPMN 2.0 от OMG
   sandbox.py    безопасное выполнение кода модели
   llm.py        запросы к модели, промпты в prompts/
   pipeline.py   сквозной конвейер
   cli.py        командная строка
 web/            FastAPI + интерфейс на bpmn-js
 examples/       входные описания и полученные схемы
-tests/          тесты, XSD BPMN 2.0 от OMG в tests/xsd
+tests/          тесты
 docs/           архитектура и план задач
 ```
 
