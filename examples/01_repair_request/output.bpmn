@@ -100,7 +100,7 @@
       <bpmn:incoming>Flow_15</bpmn:incoming>
       <bpmn:outgoing>Flow_16</bpmn:outgoing>
     </bpmn:scriptTask>
-    <bpmn:dataStoreReference id="DataStoreReference_1" name="Журнал заявок"/>
+    <bpmn:dataStoreReference id="DataStoreReference_1" name="Журнал заявок" dataStoreRef="DataStore_DataStoreReference_1"/>
     <bpmn:dataObject id="DataObject_DataObjectReference_1"/>
     <bpmn:dataObjectReference id="DataObjectReference_1" name="Наряд-допуск" dataObjectRef="DataObject_DataObjectReference_1"/>
     <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="UserTask_1"/>
@@ -120,6 +120,7 @@
     <bpmn:sequenceFlow id="Flow_15" sourceRef="UserTask_8" targetRef="ScriptTask_1"/>
     <bpmn:sequenceFlow id="Flow_16" sourceRef="ScriptTask_1" targetRef="EndEvent_1"/>
   </bpmn:process>
+  <bpmn:dataStore id="DataStore_DataStoreReference_1" name="Журнал заявок"/>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_1">
       <bpmndi:BPMNShape id="Pool_1_di" bpmnElement="Pool_1" isHorizontal="true">
