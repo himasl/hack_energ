@@ -88,7 +88,7 @@ def check_logic(graph, report):
         if node.type in ("exclusiveGateway", "inclusiveGateway") and len(outs) > 1 and not all(f.name for f in outs):
             report.warnings.append(f"У развилки {name} подписаны не все ветки")
         if node.type in GATEWAYS and node.name and len(ins) == 1 and len(outs) == 1:
-            report.warnings.append(f"У развилки {name} только одна ветка: похоже, вторая потерялась")
+            report.block(f"У развилки {name} только одна ветка: похоже, вторая потерялась. Добавьте ветку для другого исхода условия")
         if node.type == "dataObjectReference":
             made = graph.incoming(node.id, "dataOutputAssociation")
             used = graph.outgoing(node.id, "dataInputAssociation")
@@ -169,7 +169,10 @@ def connect_dangling(graph, report):
         for node in no_in:
             graph.add_flow(event(graph, scope_id, "startEvent"), node.id)
             if not (inner and len(no_in) == 1):
-                report.warnings.append(f"Обрыв логики: в {label(graph, node.id)} ничего не ведёт, соединено со стартом")
+                report.block(
+                    f"Обрыв логики: в {label(graph, node.id)} ничего не ведёт, соединено со стартом. "
+                    f"Свяжите этот шаг с шагом, после которого он выполняется"
+                )
         for node in no_out:
             graph.add_flow(node.id, event(graph, scope_id, "endEvent"))
             if not (inner and len(no_out) == 1):
@@ -310,7 +313,10 @@ def close_pools(graph, report):
             continue
         if not graph.incoming(node.id, SEQ):
             if not graph.incoming(node.id, "messageFlow"):
-                report.warnings.append(f"Обрыв логики: в {label(graph, node.id)} ничего не ведёт, соединено со стартом")
+                report.block(
+                    f"Обрыв логики: в {label(graph, node.id)} ничего не ведёт, соединено со стартом. "
+                    f"Свяжите этот шаг с шагом, после которого он выполняется"
+                )
             graph.add_flow(pool_event(graph, node.id, "startEvent"), node.id)
         if not graph.outgoing(node.id, SEQ):
             graph.add_flow(node.id, pool_event(graph, node.id, "endEvent"))

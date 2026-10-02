@@ -505,3 +505,20 @@ lost = DIAGRAM.add_task('Проверить счёт', office)
 DIAGRAM.add_link(lost, receive)
 """
     assert any("'Проверить счёт' ничего не ведёт" in w for w in build_from_code(code).warnings)
+
+
+def test_lost_links_go_back_to_llm():
+    one_branch = """
+x = DIAGRAM.add_exclusive_gateway('Требуется отключение?', ROOT_PROCESS_ID)
+a = DIAGRAM.add_task('Согласовать', ROOT_PROCESS_ID)
+DIAGRAM.add_link(ROOT_START_TASK_ID, x)
+DIAGRAM.add_link(x, a)
+DIAGRAM.add_link(a, ROOT_END_TASK_ID)
+"""
+    assert any("только одна ветка" in m for m in build_from_code(one_branch).blocking)
+    no_entry = SIMPLE + "c = DIAGRAM.add_task('Закрыть заявку', ROOT_PROCESS_ID)\nDIAGRAM.add_link(c, ROOT_END_TASK_ID)\n"
+    result = build_from_code(no_entry)
+    assert result.xml and any("'Закрыть заявку' ничего не ведёт" in m for m in result.blocking)
+    no_exit = SIMPLE + "c = DIAGRAM.add_task('Уведомить', ROOT_PROCESS_ID)\nDIAGRAM.add_link(ROOT_START_TASK_ID, c)\n"
+    result = build_from_code(no_exit)
+    assert any("'Уведомить' процесс никуда не идёт" in w for w in result.warnings) and result.blocking == []
