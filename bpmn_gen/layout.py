@@ -321,9 +321,10 @@ def message_route(flow, grid):
     near = grid.rows[flow.source][1] + ROW_GAP / 2 if down else grid.rows[flow.source][0] - ROW_GAP / 2
     far = grid.rows[flow.target][0] - ROW_GAP / 2 if down else grid.rows[flow.target][1] + ROW_GAP / 2
     gap = grid.right_gap(flow.source) - SHIFT if tx + tw / 2 >= sx + sw / 2 else grid.left_gap(flow.source) + SHIFT
+    out_x, in_x = sx + sw / 2 + SHIFT / 2, tx + tw / 2 - SHIFT / 2
     return [
-        (sx + sw / 2, start), (sx + sw / 2, near), (gap, near),
-        (gap, far), (tx + tw / 2, far), (tx + tw / 2, end),
+        (out_x, start), (out_x, near), (gap, near),
+        (gap, far), (in_x, far), (in_x, end),
     ]
 
 
@@ -348,7 +349,7 @@ def data_route(flow, grid):
 def back_route(flow, grid, band_top, band_height):
     sx, sy, sw, sh = grid.boxes[flow.source]
     tx, ty, tw, th = grid.boxes[flow.target]
-    exit_x, entry_x = grid.right_gap(flow.source), grid.left_gap(flow.target)
+    exit_x, entry_x = grid.right_gap(flow.source) - SHIFT / 2, grid.left_gap(flow.target)
     bottoms = [
         y + h for x, y, w, h in (grid.boxes[i] for i in grid.ids)
         if x < exit_x and x + w > entry_x and band_top <= y < band_top + band_height
