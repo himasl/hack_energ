@@ -35,10 +35,11 @@ def case_name(path, folder):
     return str(path.relative_to(folder).with_suffix(""))
 
 
-def run(folder, out, code=False, png=False):
+def run(folder, out, code=False, png=False, label=""):
     out.mkdir(parents=True, exist_ok=True)
     rows = []
-    for path in find_inputs(folder, code):
+    inputs = find_inputs(folder, code)
+    for number, path in enumerate(inputs, 1):
         name = case_name(path, folder)
         target = out / f"{name.replace('/', '__')}.bpmn"
         started = time.time()
@@ -64,6 +65,8 @@ def run(folder, out, code=False, png=False):
         else:
             row["valid"] = None
         rows.append(row)
+        status = "построено" if result.xml else "не построено"
+        print(f"[{number}/{len(inputs)}] {label}{name}: {status}, попыток {result.attempts}, {row['seconds']} с", flush=True)
     write_report(rows, out)
     return rows
 
@@ -94,7 +97,7 @@ def compare_models(folder, out, models, png=False):
     results = []
     for model in models:
         os.environ["LLM_MODEL"] = model
-        rows = run(folder, out / model.replace("/", "_").replace(":", "_"), png=png)
+        rows = run(folder, out / model.replace("/", "_").replace(":", "_"), png=png, label=f"{model} · ")
         total = summary(rows)
         results.append({
             "model": model,
