@@ -58,6 +58,14 @@ docker compose up --build
 
 Открыть http://localhost:8000. Переменные из `.env` передаются в контейнер через `docker-compose.yml`, поэтому при запуске LLM будет доступен в веб-API и CLI.
 
+Если Docker Hub недоступен (сборка падает на `FROM python:3.11-slim` с таймаутом),
+возьмите тот же официальный образ из зеркала: добавьте в `.env` строку
+`BASE_IMAGE=mirror.gcr.io/library/python:3.11-slim` или запустите
+
+```bash
+BASE_IMAGE=mirror.gcr.io/library/python:3.11-slim docker compose up --build
+```
+
 Если LLM запущена на этом же компьютере (например, Ollama), в `.env` для Docker
 укажите `LLM_BASE_URL=http://host.docker.internal:11434/v1`: внутри контейнера
 `localhost` — это сам контейнер. Облачным провайдерам это не нужно.
