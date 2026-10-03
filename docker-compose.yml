@@ -18,9 +18,9 @@ services:
       - path: .env
         required: false
     environment:
-      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:11434/v1}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://ollama.com/v1}
       LLM_API_KEY: ${LLM_API_KEY:-changeme}
-      LLM_MODEL: ${LLM_MODEL:-qwen2.5-coder:14b}
+      LLM_MODEL: ${LLM_MODEL:-gpt-oss:120b}
       LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.2}
-      LLM_TIMEOUT: ${LLM_TIMEOUT:-60}
+      LLM_TIMEOUT: ${LLM_TIMEOUT:-180}
       LLM_MAX_REPAIRS: ${LLM_MAX_REPAIRS:-2}
