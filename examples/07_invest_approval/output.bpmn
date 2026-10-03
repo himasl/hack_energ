@@ -313,9 +313,7 @@
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="DataInputAssociation_1_di" bpmnElement="DataInputAssociation_1">
         <di:waypoint x="294" y="250"/>
-        <di:waypoint x="378" y="250"/>
-        <di:waypoint x="378" y="330"/>
-        <di:waypoint x="456" y="330"/>
+        <di:waypoint x="456" y="250"/>
         <di:waypoint x="456" y="350"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="DataInputAssociation_2_di" bpmnElement="DataInputAssociation_2">
@@ -335,9 +333,7 @@
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="DataInputAssociation_4_di" bpmnElement="DataInputAssociation_4">
         <di:waypoint x="1054" y="865"/>
-        <di:waypoint x="1138" y="865"/>
-        <di:waypoint x="1138" y="930"/>
-        <di:waypoint x="1216" y="930"/>
+        <di:waypoint x="1216" y="865"/>
         <di:waypoint x="1216" y="950"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="DataOutputAssociation_3_di" bpmnElement="DataOutputAssociation_3">

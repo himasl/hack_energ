@@ -271,9 +271,7 @@
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="DataInputAssociation_1_di" bpmnElement="DataInputAssociation_1">
         <di:waypoint x="1344" y="465"/>
-        <di:waypoint x="1428" y="465"/>
-        <di:waypoint x="1428" y="530"/>
-        <di:waypoint x="1616" y="530"/>
+        <di:waypoint x="1616" y="465"/>
         <di:waypoint x="1616" y="550"/>
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>

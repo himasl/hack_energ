@@ -31,21 +31,48 @@ def size(node):
 
 
 def layout(graph):
+    owners = {}
+    for n in graph.nodes.values():
+        steps = list(dict.fromkeys(linked(graph, n.id))) if n.type in DATA else []
+        if len(steps) > 1:
+            owners[n.id] = min(steps, key=lambda step: mess(graph, build(graph, {**owners, n.id: step})))
+    return build(graph, owners)
+
+
+def build(graph, owners):
     out = Layout()
-    place(graph, graph.root.id, out, MARGIN, MARGIN)
+    place(graph, graph.root.id, out, MARGIN, MARGIN, owners)
     add_groups(graph, out)
     return out
+
+
+def linked(graph, data_id):
+    return [f.source for f in graph.incoming(data_id)] + [f.target for f in graph.outgoing(data_id)]
+
+
+def mess(graph, out):
+    flows = [f for f in graph.flows if f.id in out.edges]
+    lines = {f.id: list(zip(out.edges[f.id], out.edges[f.id][1:])) for f in flows}
+    crossings = sum(
+        1 for k, a in enumerate(flows) for b in flows[k + 1:]
+        for s in lines[a.id] for t in lines[b.id] if crosses(s, t)
+    )
+    through = sum(
+        1 for f in flows for s in lines[f.id] for n in graph.nodes.values()
+        if n.type != "subProcess" and n.id not in (f.source, f.target) and through_box(s, out.shapes[n.id])
+    )
+    return through * 100 + crossings
 
 
 def scope(graph, node_id):
     return graph.find_up(node_id, "process", "subProcess").id
 
 
-def place(graph, scope_id, out, x0, y0):
+def place(graph, scope_id, out, x0, y0, owners):
     nodes = [n for n in graph.nodes.values() if scope(graph, n.id) == scope_id]
     ids = {n.id for n in nodes}
     flows = [f for f in graph.flows if f.source in ids and f.target in ids]
-    sizes = {n.id: measure(graph, n.id) if n.type == "subProcess" else size(n) for n in nodes}
+    sizes = {n.id: measure(graph, n.id, owners) if n.type == "subProcess" else size(n) for n in nodes}
     steps = [n for n in nodes if n.type not in DATA]
     rank, order, back = ranking(steps, [f for f in flows if f.kind not in DATA_FLOWS])
 
@@ -56,8 +83,8 @@ def place(graph, scope_id, out, x0, y0):
     attached = []
     for n in nodes:
         if n.type in DATA:
-            links = [f.source for f in graph.incoming(n.id)] + [f.target for f in graph.outgoing(n.id)]
-            owner = links[0] if links else None
+            links = linked(graph, n.id)
+            owner = owners.get(n.id, links[0] if links else None)
             rank[n.id] = rank[owner] if owner else 0
             order[n.id] = order[owner] + 0.25 if owner else len(order)
             if owner:
@@ -118,7 +145,7 @@ def place(graph, scope_id, out, x0, y0):
     for n in nodes:
         out.shapes[n.id] = boxes[n.id]
         if n.type == "subProcess":
-            place(graph, n.id, out, *boxes[n.id][:2])
+            place(graph, n.id, out, *boxes[n.id][:2], owners)
 
     if pooled:
         add_pools(graph, bands, band_y, band_h, out, x0, width)
@@ -138,7 +165,8 @@ def place(graph, scope_id, out, x0, y0):
                           if (f.target, f.source) in links else 0)
         for f in flows if f.kind in DATA_FLOWS
     }
-    for f in sorted((f for f in flows if f.id in data), key=lambda f: len(data[f.id])):
+    for f in sorted((f for f in flows if f.id in data), key=lambda f: len(data[f.id])) * 2:
+        routed.pop(f.id, None)
         routed[f.id] = best(data[f.id], f, grid, routed)
     separate(flows, routed, grid)
     for f in flows:
@@ -175,8 +203,8 @@ def overlaps(a, b):
     return a[0] < b[0] + b[2] and b[0] < a[0] + a[2] and a[1] < b[1] + b[3] and b[1] < a[1] + a[3]
 
 
-def measure(graph, node_id):
-    return place(graph, node_id, Layout(), 0, 0)
+def measure(graph, node_id, owners):
+    return place(graph, node_id, Layout(), 0, 0, owners)
 
 
 def ranking(nodes, flows):
@@ -373,13 +401,17 @@ def data_routes(flow, grid, offset=0):
             return [points[::-1] if output else points]
     near_right = tx + tw / 2 >= dx + dw / 2
     options = []
+    if grid.rank[data] != grid.rank[task] and not ty <= middle <= ty + th:
+        points = [(dx + dw if near_right else dx, middle), (task_x, middle), (task_x, ty if below else ty + th)]
+        options.append(points[::-1] if output else points)
     for right in (near_right, not near_right):
-        edge, gap = (dx + dw, grid.right_gap(data) + SHIFT) if right else (dx, grid.left_gap(data) - SHIFT)
-        for top_side in (below, not below):
-            far = grid.rows[task][0] - ROW_GAP / 2 if top_side else grid.rows[task][1] + ROW_GAP / 2
-            end = ty if top_side else ty + th
-            points = [(edge, middle), (gap, middle), (gap, far + offset), (task_x, far + offset), (task_x, end)]
-            options.append(points[::-1] if output else points)
+        for shift in (SHIFT, -SHIFT):
+            edge, gap = (dx + dw, grid.right_gap(data) + shift) if right else (dx, grid.left_gap(data) - shift)
+            for top_side in (below, not below):
+                far = grid.rows[task][0] - ROW_GAP / 2 if top_side else grid.rows[task][1] + ROW_GAP / 2
+                end = ty if top_side else ty + th
+                points = [(edge, middle), (gap, middle), (gap, far + offset), (task_x, far + offset), (task_x, end)]
+                options.append(points[::-1] if output else points)
     return options
 
 

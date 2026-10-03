@@ -4,7 +4,10 @@ from pathlib import Path
 import pytest
 from lxml import etree
 
+from bpmn_gen.layout import build, layout, mess
 from bpmn_gen.pipeline import build_from_code
+from bpmn_gen.sandbox import run_code
+from bpmn_gen.validate import validate
 from tests.bpmn_moddle import AVAILABLE, moddle_warnings
 from bpmn_gen.quality import xsd_errors
 
@@ -598,3 +601,25 @@ DIAGRAM.add_link(check, ROOT_END_TASK_ID)
     assert not any("Обрыв логики" in w for w in result.warnings)
     assert any("добавлена стрелка" in f for f in result.fixes)
     assert xsd_errors(result.xml) == []
+
+
+def test_document_stands_where_links_cross_less():
+    code = """
+pool, (client, office) = DIAGRAM.add_pool(ROOT_PROCESS_ID, ['Заявитель', 'Сетевая организация'])
+ask = DIAGRAM.add_user_task('Подать заявку', client)
+send = DIAGRAM.add_user_task('Отправить договор', office)
+sign = DIAGRAM.add_user_task('Подписать договор', client)
+terms = DIAGRAM.add_data_object('Технические условия', office)
+contract = DIAGRAM.add_data_object('Проект договора', office)
+DIAGRAM.add_link(ROOT_START_TASK_ID, ask)
+DIAGRAM.add_link(ask, send)
+DIAGRAM.add_link(send, sign)
+DIAGRAM.add_link(sign, ROOT_END_TASK_ID)
+DIAGRAM.add_link(send, terms)
+DIAGRAM.add_link(send, contract)
+DIAGRAM.add_link(terms, sign)
+DIAGRAM.add_link(contract, sign)
+"""
+    graph = run_code(code).graph
+    validate(graph)
+    assert mess(graph, layout(graph)) < mess(graph, build(graph, {}))
