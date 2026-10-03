@@ -24,6 +24,7 @@ def validate(graph):
         return report
     check_logic(graph, report)
     drop_empty_gateways(graph, report)
+    link_through_documents(graph, report)
     connect_dangling(graph, report)
     put_into_lanes(graph, report)
     check_data_pools(graph, report)
@@ -179,6 +180,35 @@ def drop_empty_gateways(graph, report):
             ins[0].name = ins[0].name or outs[0].name
             graph.flows.remove(outs[0])
             del graph.nodes[node.id]
+
+
+def leads_to(graph, a, b):
+    seen, stack = {a}, [a]
+    while stack:
+        for f in graph.outgoing(stack.pop(), SEQ):
+            if f.target == b:
+                return True
+            if f.target not in seen:
+                seen.add(f.target)
+                stack.append(f.target)
+    return False
+
+
+def link_through_documents(graph, report):
+    for doc in [n for n in graph.nodes.values() if n.type == "dataObjectReference"]:
+        makers = [f.source for f in graph.incoming(doc.id, "dataOutputAssociation")]
+        users = [f.target for f in graph.outgoing(doc.id, "dataInputAssociation")]
+        for user in users:
+            if graph.incoming(user, SEQ):
+                continue
+            free = [m for m in makers if not graph.outgoing(m, SEQ)] or makers
+            maker = next((m for m in free if m != user and scope(graph, m) == scope(graph, user)), None)
+            if maker and not leads_to(graph, user, maker):
+                graph.add_flow(maker, user)
+                report.fixes.append(
+                    f"{label(graph, user)} идёт после {label(graph, maker)}: шаги были связаны только "
+                    f"через документ {label(graph, doc.id)}, добавлена стрелка между ними"
+                )
 
 
 def many_pools(graph):

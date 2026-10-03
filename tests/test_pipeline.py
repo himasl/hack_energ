@@ -581,3 +581,20 @@ def test_title_from_description():
     assert 'name="Приём заявки"' in result.xml
     named = build_from_code(DOCUMENTS, "Приём заявки. Оператор принимает заявку.")
     assert 'name="Технологическое присоединение"' in named.xml
+
+
+def test_steps_linked_only_through_document_get_a_flow():
+    code = """
+make = DIAGRAM.add_user_task('Составить акт', ROOT_PROCESS_ID)
+check = DIAGRAM.add_user_task('Проверить акт', ROOT_PROCESS_ID)
+act = DIAGRAM.add_data_object('Акт', ROOT_PROCESS_ID)
+DIAGRAM.add_link(ROOT_START_TASK_ID, make)
+DIAGRAM.add_link(make, act)
+DIAGRAM.add_link(act, check)
+DIAGRAM.add_link(check, ROOT_END_TASK_ID)
+"""
+    result = build_from_code(code)
+    assert result.errors == []
+    assert not any("Обрыв логики" in w for w in result.warnings)
+    assert any("добавлена стрелка" in f for f in result.fixes)
+    assert xsd_errors(result.xml) == []

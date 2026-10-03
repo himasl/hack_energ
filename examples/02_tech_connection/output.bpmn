@@ -9,192 +9,270 @@
         <bpmn:flowNodeRef>StartEvent_1</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>EndEvent_1</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>UserTask_1</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>UserTask_3</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>UserTask_5</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>UserTask_7</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>UserTask_4</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>UserTask_8</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>UserTask_9</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>UserTask_10</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>UserTask_13</bpmn:flowNodeRef>
       </bpmn:lane>
       <bpmn:lane id="Lane_2" name="Специалист по техприсоединению">
         <bpmn:flowNodeRef>UserTask_2</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>ExclusiveGateway_1</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>ScriptTask_1</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>ScriptTask_2</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>UserTask_3</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>UserTask_5</bpmn:flowNodeRef>
       </bpmn:lane>
       <bpmn:lane id="Lane_3" name="Отдел перспективного развития">
-        <bpmn:flowNodeRef>UserTask_4</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>ScriptTask_3</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>UserTask_6</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>UserTask_7</bpmn:flowNodeRef>
       </bpmn:lane>
       <bpmn:lane id="Lane_4" name="Сетевая организация">
         <bpmn:flowNodeRef>ParallelGateway_1</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>UserTask_6</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ScriptTask_1</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>ParallelGateway_2</bpmn:flowNodeRef>
       </bpmn:lane>
       <bpmn:lane id="Lane_5" name="Инспектор">
-        <bpmn:flowNodeRef>UserTask_8</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>UserTask_11</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>UserTask_12</bpmn:flowNodeRef>
       </bpmn:lane>
     </bpmn:laneSet>
     <bpmn:startEvent id="StartEvent_1">
       <bpmn:outgoing>Flow_1</bpmn:outgoing>
     </bpmn:startEvent>
     <bpmn:endEvent id="EndEvent_1">
-      <bpmn:incoming>Flow_18</bpmn:incoming>
+      <bpmn:incoming>Flow_20</bpmn:incoming>
     </bpmn:endEvent>
-    <bpmn:userTask id="UserTask_1" name="Подать заявку и план">
+    <bpmn:userTask id="UserTask_1" name="Подать заявку">
       <bpmn:incoming>Flow_1</bpmn:incoming>
       <bpmn:outgoing>Flow_2</bpmn:outgoing>
+      <bpmn:dataOutputAssociation id="DataOutputAssociation_1">
+        <bpmn:targetRef>DataObjectReference_1</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
     </bpmn:userTask>
-    <bpmn:userTask id="UserTask_2" name="Проверить комплектность документов">
+    <bpmn:dataObject id="DataObject_DataObjectReference_1"/>
+    <bpmn:dataObjectReference id="DataObjectReference_1" name="План расположения энергопринимающих устройств" dataObjectRef="DataObject_DataObjectReference_1"/>
+    <bpmn:userTask id="UserTask_2" name="Проверить комплектность заявки">
       <bpmn:incoming>Flow_2</bpmn:incoming>
       <bpmn:incoming>Flow_7</bpmn:incoming>
       <bpmn:outgoing>Flow_3</bpmn:outgoing>
+      <bpmn:property id="Property_DataInputAssociation_1" name="__targetRef_placeholder"/>
+      <bpmn:dataInputAssociation id="DataInputAssociation_1">
+        <bpmn:sourceRef>DataObjectReference_1</bpmn:sourceRef>
+        <bpmn:targetRef>Property_DataInputAssociation_1</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
     </bpmn:userTask>
     <bpmn:exclusiveGateway id="ExclusiveGateway_1" name="Документы полные?">
       <bpmn:incoming>Flow_3</bpmn:incoming>
       <bpmn:outgoing>Flow_4</bpmn:outgoing>
       <bpmn:outgoing>Flow_5</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-    <bpmn:scriptTask id="ScriptTask_1" name="Отправить уведомление о недостающих документах">
+    <bpmn:userTask id="UserTask_3" name="Отправить уведомление о недостающих документах">
       <bpmn:incoming>Flow_5</bpmn:incoming>
       <bpmn:outgoing>Flow_6</bpmn:outgoing>
-    </bpmn:scriptTask>
-    <bpmn:userTask id="UserTask_3" name="Дополнить документы">
+    </bpmn:userTask>
+    <bpmn:userTask id="UserTask_4" name="Дозагрузить документы">
       <bpmn:incoming>Flow_6</bpmn:incoming>
       <bpmn:outgoing>Flow_7</bpmn:outgoing>
     </bpmn:userTask>
-    <bpmn:scriptTask id="ScriptTask_2" name="Зарегистрировать заявку в системе">
+    <bpmn:userTask id="UserTask_5" name="Зарегистрировать заявку в системе учёта заявок">
       <bpmn:incoming>Flow_4</bpmn:incoming>
       <bpmn:outgoing>Flow_8</bpmn:outgoing>
-    </bpmn:scriptTask>
-    <bpmn:userTask id="UserTask_4" name="Подготовить ТУ и договор">
+      <bpmn:dataOutputAssociation id="DataOutputAssociation_2">
+        <bpmn:targetRef>DataStoreReference_1</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:userTask>
+    <bpmn:dataStoreReference id="DataStoreReference_1" name="Система учёта заявок" dataStoreRef="DataStore_DataStoreReference_1"/>
+    <bpmn:userTask id="UserTask_6" name="Подготовить технические условия и проект договора">
       <bpmn:incoming>Flow_8</bpmn:incoming>
       <bpmn:outgoing>Flow_9</bpmn:outgoing>
     </bpmn:userTask>
-    <bpmn:scriptTask id="ScriptTask_3" name="Отправить ТУ и договор заявителю">
+    <bpmn:dataObject id="DataObject_DataObjectReference_2"/>
+    <bpmn:dataObjectReference id="DataObjectReference_2" name="Технические условия" dataObjectRef="DataObject_DataObjectReference_2"/>
+    <bpmn:dataObject id="DataObject_DataObjectReference_3"/>
+    <bpmn:dataObjectReference id="DataObjectReference_3" name="Проект договора" dataObjectRef="DataObject_DataObjectReference_3"/>
+    <bpmn:userTask id="UserTask_7" name="Отправить ТУ и договор заявителю">
       <bpmn:incoming>Flow_9</bpmn:incoming>
       <bpmn:outgoing>Flow_10</bpmn:outgoing>
-    </bpmn:scriptTask>
-    <bpmn:userTask id="UserTask_5" name="Подписать договор и оплатить">
+      <bpmn:dataOutputAssociation id="DataOutputAssociation_3">
+        <bpmn:targetRef>DataObjectReference_2</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+      <bpmn:dataOutputAssociation id="DataOutputAssociation_4">
+        <bpmn:targetRef>DataObjectReference_3</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:userTask>
+    <bpmn:userTask id="UserTask_8" name="Подписать договор">
       <bpmn:incoming>Flow_10</bpmn:incoming>
       <bpmn:outgoing>Flow_11</bpmn:outgoing>
+      <bpmn:property id="Property_DataInputAssociation_2" name="__targetRef_placeholder"/>
+      <bpmn:property id="Property_DataInputAssociation_3" name="__targetRef_placeholder"/>
+      <bpmn:dataInputAssociation id="DataInputAssociation_2">
+        <bpmn:sourceRef>DataObjectReference_2</bpmn:sourceRef>
+        <bpmn:targetRef>Property_DataInputAssociation_2</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+      <bpmn:dataInputAssociation id="DataInputAssociation_3">
+        <bpmn:sourceRef>DataObjectReference_3</bpmn:sourceRef>
+        <bpmn:targetRef>Property_DataInputAssociation_3</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
     </bpmn:userTask>
-    <bpmn:parallelGateway id="ParallelGateway_1">
+    <bpmn:userTask id="UserTask_9" name="Оплатить услуги">
       <bpmn:incoming>Flow_11</bpmn:incoming>
       <bpmn:outgoing>Flow_12</bpmn:outgoing>
-      <bpmn:outgoing>Flow_13</bpmn:outgoing>
-    </bpmn:parallelGateway>
-    <bpmn:userTask id="UserTask_6" name="Выполнить мероприятия по присоединению">
-      <bpmn:incoming>Flow_12</bpmn:incoming>
-      <bpmn:outgoing>Flow_14</bpmn:outgoing>
     </bpmn:userTask>
-    <bpmn:userTask id="UserTask_7" name="Выполнить свою часть мероприятий">
+    <bpmn:parallelGateway id="ParallelGateway_1">
+      <bpmn:incoming>Flow_12</bpmn:incoming>
+      <bpmn:outgoing>Flow_13</bpmn:outgoing>
+      <bpmn:outgoing>Flow_14</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:scriptTask id="ScriptTask_1" name="Выполнить мероприятия по присоединению">
       <bpmn:incoming>Flow_13</bpmn:incoming>
       <bpmn:outgoing>Flow_15</bpmn:outgoing>
+    </bpmn:scriptTask>
+    <bpmn:userTask id="UserTask_10" name="Выполнить свою часть мероприятий">
+      <bpmn:incoming>Flow_14</bpmn:incoming>
+      <bpmn:outgoing>Flow_16</bpmn:outgoing>
     </bpmn:userTask>
     <bpmn:parallelGateway id="ParallelGateway_2">
-      <bpmn:incoming>Flow_14</bpmn:incoming>
       <bpmn:incoming>Flow_15</bpmn:incoming>
-      <bpmn:outgoing>Flow_16</bpmn:outgoing>
-    </bpmn:parallelGateway>
-    <bpmn:userTask id="UserTask_8" name="Провести осмотр и составить акт">
       <bpmn:incoming>Flow_16</bpmn:incoming>
       <bpmn:outgoing>Flow_17</bpmn:outgoing>
-    </bpmn:userTask>
-    <bpmn:userTask id="UserTask_9" name="Подписать акт">
+    </bpmn:parallelGateway>
+    <bpmn:userTask id="UserTask_11" name="Провести осмотр">
       <bpmn:incoming>Flow_17</bpmn:incoming>
       <bpmn:outgoing>Flow_18</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="UserTask_12" name="Составить акт об осуществлении технологического присоединения">
+      <bpmn:incoming>Flow_18</bpmn:incoming>
+      <bpmn:outgoing>Flow_19</bpmn:outgoing>
+      <bpmn:dataOutputAssociation id="DataOutputAssociation_5">
+        <bpmn:targetRef>DataObjectReference_4</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:userTask>
+    <bpmn:dataObject id="DataObject_DataObjectReference_4"/>
+    <bpmn:dataObjectReference id="DataObjectReference_4" name="Акт технологического присоединения" dataObjectRef="DataObject_DataObjectReference_4"/>
+    <bpmn:userTask id="UserTask_13" name="Подписать акт">
+      <bpmn:incoming>Flow_19</bpmn:incoming>
+      <bpmn:outgoing>Flow_20</bpmn:outgoing>
+      <bpmn:property id="Property_DataInputAssociation_4" name="__targetRef_placeholder"/>
+      <bpmn:dataInputAssociation id="DataInputAssociation_4">
+        <bpmn:sourceRef>DataObjectReference_4</bpmn:sourceRef>
+        <bpmn:targetRef>Property_DataInputAssociation_4</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
     </bpmn:userTask>
     <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="UserTask_1"/>
     <bpmn:sequenceFlow id="Flow_2" sourceRef="UserTask_1" targetRef="UserTask_2"/>
     <bpmn:sequenceFlow id="Flow_3" sourceRef="UserTask_2" targetRef="ExclusiveGateway_1"/>
-    <bpmn:sequenceFlow id="Flow_4" name="да" sourceRef="ExclusiveGateway_1" targetRef="ScriptTask_2"/>
-    <bpmn:sequenceFlow id="Flow_5" name="нет" sourceRef="ExclusiveGateway_1" targetRef="ScriptTask_1"/>
-    <bpmn:sequenceFlow id="Flow_6" sourceRef="ScriptTask_1" targetRef="UserTask_3"/>
-    <bpmn:sequenceFlow id="Flow_7" sourceRef="UserTask_3" targetRef="UserTask_2"/>
-    <bpmn:sequenceFlow id="Flow_8" sourceRef="ScriptTask_2" targetRef="UserTask_4"/>
-    <bpmn:sequenceFlow id="Flow_9" sourceRef="UserTask_4" targetRef="ScriptTask_3"/>
-    <bpmn:sequenceFlow id="Flow_10" sourceRef="ScriptTask_3" targetRef="UserTask_5"/>
-    <bpmn:sequenceFlow id="Flow_11" sourceRef="UserTask_5" targetRef="ParallelGateway_1"/>
-    <bpmn:sequenceFlow id="Flow_12" sourceRef="ParallelGateway_1" targetRef="UserTask_6"/>
-    <bpmn:sequenceFlow id="Flow_13" sourceRef="ParallelGateway_1" targetRef="UserTask_7"/>
-    <bpmn:sequenceFlow id="Flow_14" sourceRef="UserTask_6" targetRef="ParallelGateway_2"/>
-    <bpmn:sequenceFlow id="Flow_15" sourceRef="UserTask_7" targetRef="ParallelGateway_2"/>
-    <bpmn:sequenceFlow id="Flow_16" sourceRef="ParallelGateway_2" targetRef="UserTask_8"/>
-    <bpmn:sequenceFlow id="Flow_17" sourceRef="UserTask_8" targetRef="UserTask_9"/>
-    <bpmn:sequenceFlow id="Flow_18" sourceRef="UserTask_9" targetRef="EndEvent_1"/>
+    <bpmn:sequenceFlow id="Flow_4" name="да" sourceRef="ExclusiveGateway_1" targetRef="UserTask_5"/>
+    <bpmn:sequenceFlow id="Flow_5" name="нет" sourceRef="ExclusiveGateway_1" targetRef="UserTask_3"/>
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="UserTask_3" targetRef="UserTask_4"/>
+    <bpmn:sequenceFlow id="Flow_7" sourceRef="UserTask_4" targetRef="UserTask_2"/>
+    <bpmn:sequenceFlow id="Flow_8" sourceRef="UserTask_5" targetRef="UserTask_6"/>
+    <bpmn:sequenceFlow id="Flow_9" sourceRef="UserTask_6" targetRef="UserTask_7"/>
+    <bpmn:sequenceFlow id="Flow_10" sourceRef="UserTask_7" targetRef="UserTask_8"/>
+    <bpmn:sequenceFlow id="Flow_11" sourceRef="UserTask_8" targetRef="UserTask_9"/>
+    <bpmn:sequenceFlow id="Flow_12" sourceRef="UserTask_9" targetRef="ParallelGateway_1"/>
+    <bpmn:sequenceFlow id="Flow_13" sourceRef="ParallelGateway_1" targetRef="ScriptTask_1"/>
+    <bpmn:sequenceFlow id="Flow_14" sourceRef="ParallelGateway_1" targetRef="UserTask_10"/>
+    <bpmn:sequenceFlow id="Flow_15" sourceRef="ScriptTask_1" targetRef="ParallelGateway_2"/>
+    <bpmn:sequenceFlow id="Flow_16" sourceRef="UserTask_10" targetRef="ParallelGateway_2"/>
+    <bpmn:sequenceFlow id="Flow_17" sourceRef="ParallelGateway_2" targetRef="UserTask_11"/>
+    <bpmn:sequenceFlow id="Flow_18" sourceRef="UserTask_11" targetRef="UserTask_12"/>
+    <bpmn:sequenceFlow id="Flow_19" sourceRef="UserTask_12" targetRef="UserTask_13"/>
+    <bpmn:sequenceFlow id="Flow_20" sourceRef="UserTask_13" targetRef="EndEvent_1"/>
   </bpmn:process>
+  <bpmn:dataStore id="DataStore_DataStoreReference_1" name="Система учёта заявок"/>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_1">
       <bpmndi:BPMNShape id="Pool_1_di" bpmnElement="Pool_1" isHorizontal="true">
-        <dc:Bounds x="60" y="60" width="2202" height="820"/>
+        <dc:Bounds x="60" y="60" width="2562" height="1270"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_1_di" bpmnElement="Lane_1" isHorizontal="true">
-        <dc:Bounds x="90" y="60" width="2172" height="140"/>
+        <dc:Bounds x="90" y="60" width="2532" height="230"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_2_di" bpmnElement="Lane_2" isHorizontal="true">
-        <dc:Bounds x="90" y="200" width="2172" height="260"/>
+        <dc:Bounds x="90" y="290" width="2532" height="350"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_3_di" bpmnElement="Lane_3" isHorizontal="true">
-        <dc:Bounds x="90" y="460" width="2172" height="140"/>
+        <dc:Bounds x="90" y="640" width="2532" height="320"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_4_di" bpmnElement="Lane_4" isHorizontal="true">
-        <dc:Bounds x="90" y="600" width="2172" height="140"/>
+        <dc:Bounds x="90" y="960" width="2532" height="140"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_5_di" bpmnElement="Lane_5" isHorizontal="true">
-        <dc:Bounds x="90" y="740" width="2172" height="140"/>
+        <dc:Bounds x="90" y="1100" width="2532" height="230"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
         <dc:Bounds x="120" y="112" width="36" height="36"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="EndEvent_1_di" bpmnElement="EndEvent_1">
-        <dc:Bounds x="2166" y="112" width="36" height="36"/>
+        <dc:Bounds x="2526" y="112" width="36" height="36"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="UserTask_1_di" bpmnElement="UserTask_1">
         <dc:Bounds x="216" y="90" width="120" height="80"/>
       </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DataObjectReference_1_di" bpmnElement="DataObjectReference_1">
+        <dc:Bounds x="258" y="210" width="36" height="50"/>
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="UserTask_2_di" bpmnElement="UserTask_2">
-        <dc:Bounds x="396" y="230" width="120" height="80"/>
+        <dc:Bounds x="396" y="320" width="120" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="ExclusiveGateway_1_di" bpmnElement="ExclusiveGateway_1" isMarkerVisible="true">
-        <dc:Bounds x="576" y="245" width="50" height="50"/>
+        <dc:Bounds x="576" y="335" width="50" height="50"/>
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="551" y="209" width="100" height="28"/>
+          <dc:Bounds x="551" y="299" width="100" height="28"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="ScriptTask_1_di" bpmnElement="ScriptTask_1">
-        <dc:Bounds x="686" y="230" width="120" height="80"/>
-      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="UserTask_3_di" bpmnElement="UserTask_3">
-        <dc:Bounds x="866" y="90" width="120" height="80"/>
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="ScriptTask_2_di" bpmnElement="ScriptTask_2">
-        <dc:Bounds x="686" y="350" width="120" height="80"/>
+        <dc:Bounds x="686" y="320" width="120" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="UserTask_4_di" bpmnElement="UserTask_4">
-        <dc:Bounds x="866" y="490" width="120" height="80"/>
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="ScriptTask_3_di" bpmnElement="ScriptTask_3">
-        <dc:Bounds x="1046" y="490" width="120" height="80"/>
+        <dc:Bounds x="866" y="90" width="120" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="UserTask_5_di" bpmnElement="UserTask_5">
-        <dc:Bounds x="1226" y="90" width="120" height="80"/>
+        <dc:Bounds x="686" y="440" width="120" height="80"/>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="ParallelGateway_1_di" bpmnElement="ParallelGateway_1">
-        <dc:Bounds x="1406" y="645" width="50" height="50"/>
+      <bpmndi:BPMNShape id="DataStoreReference_1_di" bpmnElement="DataStoreReference_1">
+        <dc:Bounds x="721" y="560" width="50" height="50"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="UserTask_6_di" bpmnElement="UserTask_6">
-        <dc:Bounds x="1516" y="630" width="120" height="80"/>
+        <dc:Bounds x="866" y="670" width="120" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DataObjectReference_2_di" bpmnElement="DataObjectReference_2">
+        <dc:Bounds x="1088" y="790" width="36" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DataObjectReference_3_di" bpmnElement="DataObjectReference_3">
+        <dc:Bounds x="1088" y="880" width="36" height="50"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="UserTask_7_di" bpmnElement="UserTask_7">
-        <dc:Bounds x="1516" y="90" width="120" height="80"/>
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="ParallelGateway_2_di" bpmnElement="ParallelGateway_2">
-        <dc:Bounds x="1696" y="645" width="50" height="50"/>
+        <dc:Bounds x="1046" y="670" width="120" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="UserTask_8_di" bpmnElement="UserTask_8">
-        <dc:Bounds x="1806" y="770" width="120" height="80"/>
+        <dc:Bounds x="1226" y="90" width="120" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="UserTask_9_di" bpmnElement="UserTask_9">
-        <dc:Bounds x="1986" y="90" width="120" height="80"/>
+        <dc:Bounds x="1406" y="90" width="120" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ParallelGateway_1_di" bpmnElement="ParallelGateway_1">
+        <dc:Bounds x="1586" y="1005" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ScriptTask_1_di" bpmnElement="ScriptTask_1">
+        <dc:Bounds x="1696" y="990" width="120" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="UserTask_10_di" bpmnElement="UserTask_10">
+        <dc:Bounds x="1696" y="90" width="120" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ParallelGateway_2_di" bpmnElement="ParallelGateway_2">
+        <dc:Bounds x="1876" y="1005" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="UserTask_11_di" bpmnElement="UserTask_11">
+        <dc:Bounds x="1986" y="1130" width="120" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="UserTask_12_di" bpmnElement="UserTask_12">
+        <dc:Bounds x="2166" y="1130" width="120" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DataObjectReference_4_di" bpmnElement="DataObjectReference_4">
+        <dc:Bounds x="2208" y="1250" width="36" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="UserTask_13_di" bpmnElement="UserTask_13">
+        <dc:Bounds x="2346" y="90" width="120" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
         <di:waypoint x="156" y="130"/>
@@ -203,91 +281,150 @@
       <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
         <di:waypoint x="336" y="130"/>
         <di:waypoint x="366" y="130"/>
-        <di:waypoint x="366" y="270"/>
-        <di:waypoint x="396" y="270"/>
+        <di:waypoint x="366" y="360"/>
+        <di:waypoint x="396" y="360"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3">
-        <di:waypoint x="516" y="270"/>
-        <di:waypoint x="576" y="270"/>
+        <di:waypoint x="516" y="360"/>
+        <di:waypoint x="576" y="360"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4">
-        <di:waypoint x="601" y="295"/>
-        <di:waypoint x="601" y="390"/>
-        <di:waypoint x="686" y="390"/>
+        <di:waypoint x="601" y="385"/>
+        <di:waypoint x="601" y="480"/>
+        <di:waypoint x="686" y="480"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5">
-        <di:waypoint x="626" y="270"/>
-        <di:waypoint x="686" y="270"/>
+        <di:waypoint x="626" y="360"/>
+        <di:waypoint x="686" y="360"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_6_di" bpmnElement="Flow_6">
-        <di:waypoint x="806" y="270"/>
-        <di:waypoint x="836" y="270"/>
+        <di:waypoint x="806" y="360"/>
+        <di:waypoint x="836" y="360"/>
         <di:waypoint x="836" y="130"/>
         <di:waypoint x="866" y="130"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_7_di" bpmnElement="Flow_7">
         <di:waypoint x="986" y="130"/>
         <di:waypoint x="1010" y="130"/>
-        <di:waypoint x="1010" y="450"/>
-        <di:waypoint x="366" y="450"/>
-        <di:waypoint x="366" y="270"/>
-        <di:waypoint x="396" y="270"/>
+        <di:waypoint x="1010" y="630"/>
+        <di:waypoint x="366" y="630"/>
+        <di:waypoint x="366" y="360"/>
+        <di:waypoint x="396" y="360"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_8_di" bpmnElement="Flow_8">
-        <di:waypoint x="806" y="390"/>
-        <di:waypoint x="836" y="390"/>
-        <di:waypoint x="836" y="530"/>
-        <di:waypoint x="866" y="530"/>
+        <di:waypoint x="806" y="480"/>
+        <di:waypoint x="836" y="480"/>
+        <di:waypoint x="836" y="710"/>
+        <di:waypoint x="866" y="710"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_9_di" bpmnElement="Flow_9">
-        <di:waypoint x="986" y="530"/>
-        <di:waypoint x="1046" y="530"/>
+        <di:waypoint x="986" y="710"/>
+        <di:waypoint x="1046" y="710"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_10_di" bpmnElement="Flow_10">
-        <di:waypoint x="1166" y="530"/>
-        <di:waypoint x="1196" y="530"/>
+        <di:waypoint x="1166" y="710"/>
+        <di:waypoint x="1196" y="710"/>
         <di:waypoint x="1196" y="130"/>
         <di:waypoint x="1226" y="130"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_11_di" bpmnElement="Flow_11">
         <di:waypoint x="1346" y="130"/>
-        <di:waypoint x="1376" y="130"/>
-        <di:waypoint x="1376" y="670"/>
-        <di:waypoint x="1406" y="670"/>
+        <di:waypoint x="1406" y="130"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_12_di" bpmnElement="Flow_12">
-        <di:waypoint x="1456" y="670"/>
-        <di:waypoint x="1516" y="670"/>
+        <di:waypoint x="1526" y="130"/>
+        <di:waypoint x="1556" y="130"/>
+        <di:waypoint x="1556" y="1030"/>
+        <di:waypoint x="1586" y="1030"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_13_di" bpmnElement="Flow_13">
-        <di:waypoint x="1431" y="645"/>
-        <di:waypoint x="1431" y="130"/>
-        <di:waypoint x="1516" y="130"/>
+        <di:waypoint x="1636" y="1030"/>
+        <di:waypoint x="1696" y="1030"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_14_di" bpmnElement="Flow_14">
-        <di:waypoint x="1636" y="670"/>
-        <di:waypoint x="1696" y="670"/>
+        <di:waypoint x="1611" y="1005"/>
+        <di:waypoint x="1611" y="130"/>
+        <di:waypoint x="1696" y="130"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_15_di" bpmnElement="Flow_15">
-        <di:waypoint x="1636" y="130"/>
-        <di:waypoint x="1721" y="130"/>
-        <di:waypoint x="1721" y="645"/>
+        <di:waypoint x="1816" y="1030"/>
+        <di:waypoint x="1876" y="1030"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_16_di" bpmnElement="Flow_16">
-        <di:waypoint x="1746" y="670"/>
-        <di:waypoint x="1776" y="670"/>
-        <di:waypoint x="1776" y="810"/>
-        <di:waypoint x="1806" y="810"/>
+        <di:waypoint x="1816" y="130"/>
+        <di:waypoint x="1901" y="130"/>
+        <di:waypoint x="1901" y="1005"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_17_di" bpmnElement="Flow_17">
-        <di:waypoint x="1926" y="810"/>
-        <di:waypoint x="1956" y="810"/>
-        <di:waypoint x="1956" y="130"/>
-        <di:waypoint x="1986" y="130"/>
+        <di:waypoint x="1926" y="1030"/>
+        <di:waypoint x="1956" y="1030"/>
+        <di:waypoint x="1956" y="1170"/>
+        <di:waypoint x="1986" y="1170"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_18_di" bpmnElement="Flow_18">
-        <di:waypoint x="2106" y="130"/>
-        <di:waypoint x="2166" y="130"/>
+        <di:waypoint x="2106" y="1170"/>
+        <di:waypoint x="2166" y="1170"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_19_di" bpmnElement="Flow_19">
+        <di:waypoint x="2286" y="1170"/>
+        <di:waypoint x="2316" y="1170"/>
+        <di:waypoint x="2316" y="130"/>
+        <di:waypoint x="2346" y="130"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_20_di" bpmnElement="Flow_20">
+        <di:waypoint x="2466" y="130"/>
+        <di:waypoint x="2526" y="130"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DataOutputAssociation_1_di" bpmnElement="DataOutputAssociation_1">
+        <di:waypoint x="276" y="170"/>
+        <di:waypoint x="276" y="210"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DataInputAssociation_1_di" bpmnElement="DataInputAssociation_1">
+        <di:waypoint x="294" y="235"/>
+        <di:waypoint x="378" y="235"/>
+        <di:waypoint x="378" y="300"/>
+        <di:waypoint x="456" y="300"/>
+        <di:waypoint x="456" y="320"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DataOutputAssociation_2_di" bpmnElement="DataOutputAssociation_2">
+        <di:waypoint x="746" y="520"/>
+        <di:waypoint x="746" y="560"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DataOutputAssociation_3_di" bpmnElement="DataOutputAssociation_3">
+        <di:waypoint x="1106" y="750"/>
+        <di:waypoint x="1106" y="790"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DataOutputAssociation_4_di" bpmnElement="DataOutputAssociation_4">
+        <di:waypoint x="1106" y="670"/>
+        <di:waypoint x="1106" y="650"/>
+        <di:waypoint x="1208" y="650"/>
+        <di:waypoint x="1208" y="905"/>
+        <di:waypoint x="1124" y="905"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DataInputAssociation_2_di" bpmnElement="DataInputAssociation_2">
+        <di:waypoint x="1088" y="815"/>
+        <di:waypoint x="1004" y="815"/>
+        <di:waypoint x="1004" y="70"/>
+        <di:waypoint x="1286" y="70"/>
+        <di:waypoint x="1286" y="90"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DataInputAssociation_3_di" bpmnElement="DataInputAssociation_3">
+        <di:waypoint x="1088" y="905"/>
+        <di:waypoint x="1004" y="905"/>
+        <di:waypoint x="1004" y="190"/>
+        <di:waypoint x="1286" y="190"/>
+        <di:waypoint x="1286" y="170"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DataOutputAssociation_5_di" bpmnElement="DataOutputAssociation_5">
+        <di:waypoint x="2226" y="1210"/>
+        <di:waypoint x="2226" y="1250"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DataInputAssociation_4_di" bpmnElement="DataInputAssociation_4">
+        <di:waypoint x="2244" y="1275"/>
+        <di:waypoint x="2328" y="1275"/>
+        <di:waypoint x="2328" y="190"/>
+        <di:waypoint x="2406" y="190"/>
+        <di:waypoint x="2406" y="170"/>
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
