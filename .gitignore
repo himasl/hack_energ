@@ -15,3 +15,11 @@ out/
 .DS_Store
 
 node_modules/
+
+# рабочие файлы CLI
+/out.bpmn
+/out.py
+/out.png
+/test.bpmn
+/test.py
+/test.png
