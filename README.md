@@ -141,6 +141,37 @@ python -m bpmn_gen.compare out/gpt-oss_20b/ bench/
 Файл `out.bpmn` открывается на [demo.bpmn.io](https://demo.bpmn.io)
 (перетащить файл в окно) или в Camunda Modeler.
 
+### Веб-демо на Streamlit
+
+В `streamlit_app/` — то же самое в виде приложения Streamlit: описание процесса или пример,
+схема в редакторе bpmn-js, предупреждения валидатора, скачивание `.bpmn`, `.svg` и кода.
+Ядро и пайплайн общие с основным веб-интерфейсом.
+
+Локально (настройки LLM берутся из `.env`):
+
+```bash
+pip install -r streamlit_app/requirements.txt
+streamlit run streamlit_app/streamlit_app.py
+```
+
+Деплой на [Streamlit Community Cloud](https://share.streamlit.io) (подключается к репозиторию на GitHub):
+
+1. **Create app** → репозиторий, ветка, **Main file path**: `streamlit_app/streamlit_app.py`.
+2. **Advanced settings** → Python 3.11 и **Secrets**:
+
+   ```toml
+   LLM_BASE_URL = "https://ollama.com/v1"
+   LLM_API_KEY = "ваш-ключ"
+   LLM_MODEL = "gpt-oss:120b"
+   LLM_TIMEOUT = "180"
+   APP_PASSWORD = "пароль для входа"
+   ```
+
+   `APP_PASSWORD` необязателен, но без него любой, у кого есть ссылка, тратит ваш ключ LLM.
+3. **Deploy**. Зависимости берутся из `streamlit_app/requirements.txt`.
+
+Экспорта в PNG в веб-демо нет — только `.bpmn` и `.svg` из редактора.
+
 ## API для генерации кода
 
 Модель пишет код на API из ТЗ; перед выполнением заданы `ROOT_PROCESS_ID`,
@@ -192,6 +223,7 @@ bpmn_gen/
   pipeline.py   сквозной конвейер
   cli.py        командная строка
 web/            FastAPI + интерфейс на bpmn-js
+streamlit_app/  то же в виде приложения Streamlit для деплоя
 examples/       входные описания и полученные схемы
 bench/          проверочный набор: 8 процессов с эталонными схемами
 tests/          тесты

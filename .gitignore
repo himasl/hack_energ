@@ -23,3 +23,6 @@ node_modules/
 /test.bpmn
 /test.py
 /test.png
+
+# секреты Streamlit
+.streamlit/secrets.toml
