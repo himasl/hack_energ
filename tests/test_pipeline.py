@@ -276,9 +276,10 @@ DIAGRAM.add_link(j, ROOT_END_TASK_ID)
 """
     text = warnings_for(xor_and)
     assert "подписаны не все ветки" in text
-    assert "будет вечно ждать" in text
-    assert "несколько раз" in warnings_for(xor_and.replace("add_exclusive_gateway", "add_parallel_gateway").replace(
-        "add_parallel_gateway('', ", "add_exclusive_gateway('', "))
+    assert "вечно ждал бы" in " | ".join(build_from_code(xor_and).fixes)
+    swapped = xor_and.replace("add_exclusive_gateway", "add_parallel_gateway").replace(
+        "add_parallel_gateway('', ", "add_exclusive_gateway('', ")
+    assert "несколько раз" in " | ".join(build_from_code(swapped).fixes)
 
     one_branch = """
 x = DIAGRAM.add_exclusive_gateway('Требуется отключение?', ROOT_PROCESS_ID)
@@ -372,34 +373,50 @@ DIAGRAM.add_link(j, ROOT_END_TASK_ID)
 """
 
 
-def test_deadlock_goes_back_to_llm(monkeypatch):
+def test_deadlock_fixed_without_llm(monkeypatch):
     import bpmn_gen.pipeline as pipeline
 
-    seen = []
-
-    def fake_generate_code(text, previous_code=None, errors=None):
-        seen.append(errors)
-        return XOR_INTO_AND if len(seen) == 1 else XOR_INTO_AND.replace("add_parallel_gateway", "add_exclusive_gateway")
-
+    calls = []
     monkeypatch.setattr(pipeline.llm, "config", lambda: {"max_repairs": 2})
-    monkeypatch.setattr(pipeline.llm, "generate_code", fake_generate_code)
+    monkeypatch.setattr(pipeline.llm, "generate_code", lambda text, previous_code=None, errors=None: calls.append(1) or XOR_INTO_AND)
 
     result = pipeline.generate("Процесс с развилкой")
-    assert result.attempts == 2
-    assert "будет вечно ждать" in seen[1][0]
+    assert len(calls) == 1 and result.attempts == 1
     assert result.blocking == [] and result.xml
+    assert any("заменён на исключающий" in f for f in result.fixes)
+    assert 'parallelGateway' not in result.xml
 
 
-def test_deadlock_kept_as_warning_after_retries(monkeypatch):
-    import bpmn_gen.pipeline as pipeline
+def test_alternatives_into_parallel_fork_get_merge():
+    code = """
+x = DIAGRAM.add_exclusive_gateway('Требуется отключение?', ROOT_PROCESS_ID)
+a = DIAGRAM.add_task('Согласовать вывод в ремонт', ROOT_PROCESS_ID)
+b = DIAGRAM.add_task('Назначить бригаду', ROOT_PROCESS_ID)
+fork = DIAGRAM.add_parallel_gateway('', ROOT_PROCESS_ID)
+c = DIAGRAM.add_task('Подготовить материалы', ROOT_PROCESS_ID)
+d = DIAGRAM.add_task('Оформить наряд', ROOT_PROCESS_ID)
+join = DIAGRAM.add_parallel_gateway('', ROOT_PROCESS_ID)
+DIAGRAM.add_link(ROOT_START_TASK_ID, x)
+DIAGRAM.add_link(x, a, name='да')
+DIAGRAM.add_link(x, b, name='нет')
+DIAGRAM.add_link(a, fork)
+DIAGRAM.add_link(b, fork)
+DIAGRAM.add_link(fork, c)
+DIAGRAM.add_link(fork, d)
+DIAGRAM.add_link(c, join)
+DIAGRAM.add_link(d, join)
+DIAGRAM.add_link(join, ROOT_END_TASK_ID)
+"""
+    from bpmn_gen.sandbox import run_code
+    from bpmn_gen.validate import validate
 
-    monkeypatch.setattr(pipeline.llm, "config", lambda: {"max_repairs": 2})
-    monkeypatch.setattr(pipeline.llm, "generate_code", lambda text, previous_code=None, errors=None: XOR_INTO_AND)
-
-    result = pipeline.generate("Процесс с развилкой")
-    assert result.attempts == 3
-    assert result.errors == [] and result.xml
-    assert any("будет вечно ждать" in w for w in result.warnings)
+    graph = run_code(code).graph
+    report = validate(graph)
+    assert report.blocking == [] and any("добавлено исключающее слияние" in f for f in report.fixes)
+    fork = next(n for n in graph.nodes.values() if n.type == "parallelGateway" and len(graph.outgoing(n.id, "sequenceFlow")) == 2)
+    merge = graph.nodes[graph.incoming(fork.id, "sequenceFlow")[0].source]
+    assert merge.type == "exclusiveGateway" and len(graph.incoming(merge.id, "sequenceFlow")) == 2
+    assert xsd_errors(build_from_code(code).xml) == []
 
 
 def test_data_errors():
@@ -481,11 +498,13 @@ DIAGRAM.add_link(a, j)
 DIAGRAM.add_link(b, j)
 DIAGRAM.add_link(j, ROOT_END_TASK_ID)
 """
-    assert any("вечно ждать" in m for m in build_from_code(code).blocking)
+    fixed = build_from_code(code)
+    assert fixed.blocking == [] and any("заменён на включающий" in f for f in fixed.fixes)
+    assert "parallelGateway" not in fixed.xml
     exclusive = code.replace("add_parallel_gateway('', ", "add_exclusive_gateway('', ")
-    assert any("столько раз" in m for m in build_from_code(exclusive).blocking)
+    assert any("заменён на включающий" in f for f in build_from_code(exclusive).fixes)
     inclusive = code.replace("add_parallel_gateway('', ", "add_inclusive_gateway('', ")
-    assert build_from_code(inclusive).blocking == []
+    assert build_from_code(inclusive).fixes == []
 
 
 def test_far_data_is_shown_twice():

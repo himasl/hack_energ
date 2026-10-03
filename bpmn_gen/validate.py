@@ -98,7 +98,7 @@ def check_links(graph, report):
 
 
 def check_logic(graph, report):
-    for node in graph.nodes.values():
+    for node in list(graph.nodes.values()):
         ins, outs = graph.incoming(node.id, SEQ), graph.outgoing(node.id, SEQ)
         name = label(graph, node.id)
         if node.type in ("exclusiveGateway", "inclusiveGateway") and len(outs) > 1 and not all(f.name for f in outs):
@@ -118,6 +118,21 @@ def check_logic(graph, report):
             check_join(graph, node, report)
 
 
+MERGES = {
+    ("exclusiveGateway", "parallelGateway"): "exclusiveGateway",
+    ("inclusiveGateway", "parallelGateway"): "inclusiveGateway",
+    ("inclusiveGateway", "exclusiveGateway"): "inclusiveGateway",
+    ("parallelGateway", "exclusiveGateway"): "parallelGateway",
+}
+GATEWAY_NAMES = {"exclusiveGateway": "исключающем", "parallelGateway": "параллельном", "inclusiveGateway": "включающем"}
+GATEWAY_KINDS = {"exclusiveGateway": "исключающий", "parallelGateway": "параллельный", "inclusiveGateway": "включающий"}
+MERGE_KINDS = {"exclusiveGateway": "исключающее", "parallelGateway": "параллельное", "inclusiveGateway": "включающее"}
+WHY = {
+    "parallelGateway": "процесс вечно ждал бы ветку, которая не выполнялась",
+    "exclusiveGateway": "следующий шаг выполнился бы несколько раз",
+}
+
+
 def check_join(graph, join, report):
     splits = set()
     for f in graph.incoming(join.id, SEQ):
@@ -134,26 +149,25 @@ def check_join(graph, join, report):
     if len(splits) != 1:
         return
     split = graph.nodes[splits.pop()]
-    if split.type == "exclusiveGateway" and join.type == "parallelGateway":
-        report.block(
-            f"Альтернативные ветки развилки {label(graph, split.id)} сходятся в параллельном шлюзе: "
-            f"процесс будет вечно ждать ветку, которая не выполнялась"
+    wanted = MERGES.get((split.type, join.type))
+    if not wanted:
+        return
+    why = WHY[join.type]
+    if len(graph.outgoing(join.id, SEQ)) <= 1:
+        old, join.type = join.type, wanted
+        report.fixes.append(
+            f"Ветки развилки {label(graph, split.id)} сходились в {GATEWAY_NAMES[old]} шлюзе ({why}): "
+            f"он заменён на {GATEWAY_KINDS[wanted]}"
         )
-    if split.type == "inclusiveGateway" and join.type == "parallelGateway":
-        report.block(
-            f"Ветки включающей развилки {label(graph, split.id)} сходятся в параллельном шлюзе: "
-            f"если выполнилась не каждая ветка, процесс будет вечно ждать. Сведите их во включающий шлюз"
-        )
-    if split.type == "inclusiveGateway" and join.type == "exclusiveGateway":
-        report.block(
-            f"Ветки включающей развилки {label(graph, split.id)} сходятся в исключающем шлюзе: "
-            f"следующий шаг выполнится столько раз, сколько веток сработало. Сведите их во включающий шлюз"
-        )
-    if split.type == "parallelGateway" and join.type == "exclusiveGateway":
-        report.block(
-            f"Параллельные ветки из {label(graph, split.id)} сходятся в исключающем шлюзе: "
-            f"следующий шаг выполнится несколько раз"
-        )
+        return
+    merge = graph.add_node(wanted, "", join.parent)
+    for f in graph.incoming(join.id, SEQ):
+        f.target = merge.id
+    graph.add_flow(merge.id, join.id)
+    report.fixes.append(
+        f"Ветки развилки {label(graph, split.id)} сходились в {GATEWAY_NAMES[join.type]} шлюзе {label(graph, join.id)} "
+        f"({why}): перед ним добавлено {MERGE_KINDS[wanted]} слияние"
+    )
 
 
 def drop_empty_gateways(graph, report):
