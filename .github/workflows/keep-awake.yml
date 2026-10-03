@@ -1,0 +1,49 @@
+name: Не давать уснуть веб-демо
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+jobs:
+  wake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      APP_URL: https://wwteambpmn.streamlit.app
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install playwright && python -m playwright install --with-deps chromium
+      - name: Открыть приложение и разбудить, если спит
+        run: |
+          python - <<'PY'
+          import os, re
+          from playwright.sync_api import sync_playwright
+
+          with sync_playwright() as p:
+              page = p.chromium.launch().new_page()
+              page.goto(os.environ["APP_URL"], wait_until="domcontentloaded", timeout=60000)
+              page.wait_for_timeout(10000)
+              wake = page.get_by_role("button", name=re.compile("get this app back up", re.I))
+              if wake.count():
+                  print("Приложение спало, будим")
+                  wake.first.click()
+              def loaded():
+                  for frame in page.frames:
+                      try:
+                          if "Архитектор BPMN" in frame.content():
+                              return True
+                      except Exception:
+                          pass
+                  return False
+
+              for _ in range(30):
+                  if loaded():
+                      print("Приложение работает")
+                      break
+                  page.wait_for_timeout(5000)
+              else:
+                  raise SystemExit("Приложение не открылось за 2,5 минуты")
+          PY
