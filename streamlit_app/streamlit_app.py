@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 import streamlit as st
+from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -19,6 +20,7 @@ def secret(name):
         return None
 
 
+load_dotenv(ROOT / ".env")
 for name in SETTINGS:
     if secret(name) is not None:
         os.environ[name] = str(secret(name))
